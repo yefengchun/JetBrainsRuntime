@@ -40,6 +40,7 @@ import java.lang.reflect.Field;
 import java.util.StringTokenizer;
 import java.util.Iterator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.io.PrintStream;
 import java.io.OutputStream;
@@ -319,20 +320,32 @@ public abstract class GraphicsPrimitive {
     public abstract GraphicsPrimitive traceWrap();
 
     static HashMap<Object, int[]> traceMap;
+    static HashSet<String> traceNotImplSet;
 
     public static int traceflags;
     public static String tracefile;
+    public static String pname;
     public static PrintStream traceout;
+    public static long treshold = 0;
+    public static boolean verbose = false;
 
     public static final int TRACELOG = 1;
     public static final int TRACETIMESTAMP = 2;
     public static final int TRACECOUNTS = 4;
+    public static final int TRACEPTIME = 8;
+    public static final int TRACEPNAME = 16;
+    public static final int TRACENOTIMPL = 32;
+
+    static void showTraceUsage() {
+        System.err.println("usage: -Dsun.java2d.trace="+
+                "[log[,timestamp]],[count],[ptime],[name:<substr pattern>],"+
+                "[out:<filename>],[td=<treshold>],[help],[verbose]");
+    }
 
     static {
         GetPropertyAction gpa = new GetPropertyAction("sun.java2d.trace");
         String trace = AccessController.doPrivileged(gpa);
         if (trace != null) {
-            boolean verbose = false;
             int traceflags = 0;
             StringTokenizer st = new StringTokenizer(trace, ",");
             while (st.hasMoreTokens()) {
@@ -343,19 +356,33 @@ public abstract class GraphicsPrimitive {
                     traceflags |= GraphicsPrimitive.TRACELOG;
                 } else if (tok.equalsIgnoreCase("timestamp")) {
                     traceflags |= GraphicsPrimitive.TRACETIMESTAMP;
+                } else if (tok.equalsIgnoreCase("ptime")) {
+                    traceflags |=GraphicsPrimitive.TRACEPTIME;
+                } else if (tok.equalsIgnoreCase("notimpl")) {
+                    traceflags |=GraphicsPrimitive.TRACENOTIMPL;
+                } else if (tok.regionMatches(true, 0, "name:", 0, 5)) {
+                    traceflags |=GraphicsPrimitive.TRACEPNAME;
+                    pname = tok.substring(6);
                 } else if (tok.equalsIgnoreCase("verbose")) {
                     verbose = true;
                 } else if (tok.regionMatches(true, 0, "out:", 0, 4)) {
                     tracefile = tok.substring(4);
+                } else if (tok.regionMatches(true, 0, "td=", 0, 3)) {
+                    try {
+                        treshold = Long.parseLong(tok.substring(3));
+                    } catch (NumberFormatException e) {
+                        showTraceUsage();
+                    }
                 } else {
                     if (!tok.equalsIgnoreCase("help")) {
                         System.err.println("unrecognized token: "+tok);
                     }
-                    System.err.println("usage: -Dsun.java2d.trace="+
-                                       "[log[,timestamp]],[count],"+
-                                       "[out:<filename>],[help],[verbose]");
+                    showTraceUsage();
                 }
             }
+
+            GraphicsPrimitiveMgr.setTraceFlags(traceflags);
+
             if (verbose) {
                 System.err.print("GraphicsPrimitive logging ");
                 if ((traceflags & GraphicsPrimitive.TRACELOG) != 0) {
@@ -416,7 +443,12 @@ public abstract class GraphicsPrimitive {
     }
 
     public static class TraceReporter implements Runnable {
-        public static void setShutdownHook() {
+        private static boolean hookEnabled = false;
+
+        public static synchronized void setShutdownHook() {
+            if (hookEnabled) return;
+            hookEnabled = true;
+
             AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
                 TraceReporter t = new TraceReporter();
                 Thread thread = new Thread(
@@ -430,33 +462,47 @@ public abstract class GraphicsPrimitive {
 
         public void run() {
             PrintStream ps = getTraceOutputFile();
-            Iterator<Map.Entry<Object, int[]>> iterator =
-                traceMap.entrySet().iterator();
-            long total = 0;
-            int numprims = 0;
-            while (iterator.hasNext()) {
-                Map.Entry<Object, int[]> me = iterator.next();
-                Object prim = me.getKey();
-                int[] count = me.getValue();
-                if (count[0] == 1) {
-                    ps.print("1 call to ");
-                } else {
-                    ps.print(count[0]+" calls to ");
+            if (traceMap != null) {
+                Iterator<Map.Entry<Object, int[]>> iterator =
+                        traceMap.entrySet().iterator();
+                long total = 0;
+                int numprims = 0;
+                while (iterator.hasNext()) {
+                    Map.Entry<Object, int[]> me = iterator.next();
+                    Object prim = me.getKey();
+                    int[] count = me.getValue();
+                    if (count[0] == 1) {
+                        ps.print("1 call to ");
+                    } else {
+                        ps.print(count[0] + " calls to ");
+                    }
+                    ps.println(prim);
+                    numprims++;
+                    total += count[0];
                 }
-                ps.println(prim);
-                numprims++;
-                total += count[0];
+                if (numprims == 0) {
+                    ps.println("No graphics primitives executed");
+                } else if (numprims > 1) {
+                    ps.println(total + " total calls to " +
+                            numprims + " different primitives");
+                }
             }
-            if (numprims == 0) {
-                ps.println("No graphics primitives executed");
-            } else if (numprims > 1) {
-                ps.println(total+" total calls to "+
-                           numprims+" different primitives");
+
+            if (traceNotImplSet != null) {
+                ps.println("Not implemented graphics primitives:");
+
+                for (String name : traceNotImplSet) {
+                    ps.println(name);
+                }
             }
         }
     }
 
-    public static synchronized void tracePrimitive(Object prim) {
+    public synchronized static void tracePrimitive(Object prim) {
+        if ((traceflags & TRACEPNAME) != 0) {
+            if (!prim.toString().contains(pname)) return;
+        }
+
         if ((traceflags & TRACECOUNTS) != 0) {
             if (traceMap == null) {
                 traceMap = new HashMap<>();
@@ -475,6 +521,46 @@ public abstract class GraphicsPrimitive {
                 ps.print(System.currentTimeMillis()+": ");
             }
             ps.println(prim);
+        }
+    }
+
+    public synchronized static void traceNotImplPrimitive(Object prim) {
+        if ((traceflags & TRACEPNAME) != 0) {
+            if (!prim.toString().contains(pname)) return;
+        }
+
+        if ((traceflags & TRACECOUNTS) != 0) {
+            if (traceNotImplSet == null) {
+                traceNotImplSet = new HashSet<String>();
+                TraceReporter.setShutdownHook();
+            }
+            traceNotImplSet.add(prim.toString());
+        }
+        if ((traceflags & TRACELOG) != 0) {
+            PrintStream ps = getTraceOutputFile();
+            if ((traceflags & TRACETIMESTAMP) != 0) {
+                ps.print(System.currentTimeMillis()+":[NOT IMPL] ");
+            }
+            ps.println(prim);
+        }
+    }
+
+    public synchronized static void tracePrimitiveTime(Object prim, long time) {
+        if ((traceflags & TRACEPNAME) != 0) {
+            if (!prim.toString().contains(pname)) return;
+        }
+        if (time > treshold && (traceflags & TRACEPTIME) != 0  && (traceflags & TRACELOG) != 0) {
+            PrintStream ps = getTraceOutputFile();
+            ps.println(prim + " time: " + time);
+            if (verbose) {
+                final StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+                if (stackTrace.length > 3) {
+                    for (int i = 3; i < stackTrace.length; i++) {
+                        ps.println("  " + stackTrace[i].toString());
+                    }
+                }
+                ps.println();
+            }
         }
     }
 

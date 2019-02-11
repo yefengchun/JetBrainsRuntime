@@ -27,11 +27,14 @@
 #define _Included_Trace
 
 #include <jni.h>
+#include "jni_util.h"
 #include "debug_trace.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+extern JavaVM *jvm;
+extern jint graphicsPrimitive_traceflags;
 
 /**
  * J2dTrace
@@ -174,6 +177,30 @@ J2dTraceInit();
 #define J2dRlsTraceLn5(level, string, arg1, arg2, arg3, arg4, arg5) { \
             J2dTraceImpl(level, JNI_TRUE, string, arg1, arg2, arg3, arg4, arg5); \
         }
+
+#define J2dTracePrimitive(string) { \
+        if (graphicsPrimitive_traceflags && jvm) { \
+            JNIEnv *env; \
+            jstring jstr; \
+            (*jvm)->AttachCurrentThreadAsDaemon(jvm, &env, NULL); \
+            jstr = (*env)->NewStringUTF(env, string); \
+            JNU_CallStaticMethodByName(env, NULL, "sun/java2d/loops/GraphicsPrimitive", \
+                                       "tracePrimitive", "(Ljava/lang/Object;)V", jstr); \
+            (*env)->DeleteLocalRef(env, jstr); \
+        } \
+    }
+
+#define J2dTraceNotImplPrimitive(string) { \
+        if (graphicsPrimitive_traceflags && jvm) { \
+            JNIEnv *env; \
+            jstring jstr; \
+            (*jvm)->AttachCurrentThreadAsDaemon(jvm, &env, NULL); \
+            jstr = (*env)->NewStringUTF(env, string); \
+            JNU_CallStaticMethodByName(env, NULL, "sun/java2d/loops/GraphicsPrimitive", \
+                                       "traceNotImplPrimitive", "(Ljava/lang/Object;)V", jstr); \
+            (*env)->DeleteLocalRef(env, jstr); \
+        } \
+    }
 
 #ifdef __cplusplus
 };
