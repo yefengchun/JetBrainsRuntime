@@ -77,6 +77,15 @@ typedef struct {
     jint       alphaCompositeRule;
     jint       xorPixel;
     jint       pixel;
+
+    jdouble    p0;
+    jdouble    p1;
+    jdouble    p3;
+    jboolean   cyclic;
+    jint       pixel1;
+    jint       pixel2;
+
+
     jubyte     r;
     jubyte     g;
     jubyte     b;
@@ -96,6 +105,7 @@ typedef struct {
     id<MTLRenderPipelineState>  mtlBlitMatrixPipelineState;
     id<MTLRenderPipelineState>  mtlBlitSrcOverPipelineState;
     id<MTLRenderPipelineState>  mtlBlitMatrixSrcOverPipelineState; // TODO: implement PipelineStateFactory
+    id<MTLRenderPipelineState>  mtlGradPipelineState;
     id<MTLCommandQueue>         mtlCommandQueue;
     id<MTLCommandBuffer>        mtlCommandBuffer;
     id<MTLBuffer>               mtlVertexBuffer;

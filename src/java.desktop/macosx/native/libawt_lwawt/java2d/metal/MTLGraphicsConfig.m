@@ -195,8 +195,10 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
     id <MTLFunction> vertColFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_col"];
     id <MTLFunction> vertTxtFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_txt"];
     id <MTLFunction> vertTxtMatrixFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_txt_matrix"];
+    id <MTLFunction> vertGradFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_grad"];
     id <MTLFunction> fragColFunc = [mtlc->mtlLibrary newFunctionWithName:@"frag_col"];
     id <MTLFunction> fragTxtFunc = [mtlc->mtlLibrary newFunctionWithName:@"frag_txt"];
+    id <MTLFunction> fragGradFunc = [mtlc->mtlLibrary newFunctionWithName:@"frag_grad"];
 
     // Create depth state.
     MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
@@ -224,6 +226,18 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
         exit(0);
     }
 
+    pipelineDesc = [MTLRenderPipelineDescriptor new];
+    pipelineDesc.sampleCount = 1;
+    pipelineDesc.vertexFunction = vertGradFunc;
+    pipelineDesc.fragmentFunction = fragGradFunc;
+    pipelineDesc.vertexDescriptor = vertDesc;
+    pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    mtlc->mtlGradPipelineState = [mtlc->mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+    if (!mtlc->mtlGradPipelineState) {
+        NSLog(@"Failed to create pipeline state, error %@", error);
+        exit(0);
+    }
+
     vertDesc = [MTLVertexDescriptor new];
     vertDesc.attributes[VertexAttributePosition].format = MTLVertexFormatFloat3;
     vertDesc.attributes[VertexAttributePosition].offset = 0;
@@ -243,19 +257,7 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
     pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
     mtlc->mtlBlitPipelineState = [mtlc->mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
     if (!mtlc->mtlBlitPipelineState) {
-        NSLog(@"Failed to create blit pipeline state, error %@", error);
-        exit(0);
-    }
-
-    pipelineDesc = [MTLRenderPipelineDescriptor new];
-    pipelineDesc.sampleCount = 1;
-    pipelineDesc.vertexFunction = vertTxtMatrixFunc;
-    pipelineDesc.fragmentFunction = fragTxtFunc;
-    pipelineDesc.vertexDescriptor = vertDesc;
-    pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    mtlc->mtlBlitMatrixPipelineState = [mtlc->mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
-    if (!mtlc->mtlBlitMatrixPipelineState) {
-        NSLog(@"Failed to create blit with matrix pipeline state, error %@", error);
+        NSLog(@"Failed to create pipeline state, error %@", error);
         exit(0);
     }
 
