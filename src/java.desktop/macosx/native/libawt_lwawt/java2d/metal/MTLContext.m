@@ -409,18 +409,32 @@ MTLContext_InitBlitTileTexture(MTLContext *mtlc)
 void
 MTLContext_DestroyContextResources(MTLContext *mtlc)
 {
-    //TODO
-    J2dTraceNotImplPrimitive("MTLContext_DestroyContextResources");
+    J2dTracePrimitive("MTLContext_DestroyContextResources");
     J2dTraceLn(J2D_TRACE_INFO, "MTLContext_DestroyContextResources");
 
-    NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
     [mtlc->mtlTexturePool release];
+    mtlc->mtlTexturePool = nil;
+
+    [mtlc->mtlLibrary release];
+    mtlc->mtlLibrary = nil;
+
+    [mtlc->mtlVertexBuffer release];
+    mtlc->mtlVertexBuffer = nil;
+
+    [mtlc->mtlCommandQueue release];
+    mtlc->mtlCommandQueue = nil;
+
     [mtlc->mtlDevice release];
     mtlc->mtlDevice = nil;
 
-    [pool drain];
-    //if (mtlc->blitTextureID != 0) {
-    //}
+    [mtlc->mtlPipelineState release];
+    mtlc->mtlPipelineState = nil;
+    [mtlc->mtlBlitPipelineState release];
+    mtlc->mtlBlitPipelineState = nil;
+    [mtlc->mtlBlitMatrixPipelineState release];
+    mtlc->mtlBlitMatrixPipelineState = nil;
+    [mtlc->mtlBlitMatrixSrcOverPipelineState release];
+    mtlc->mtlBlitMatrixSrcOverPipelineState = nil;
 }
 
 /*

@@ -179,11 +179,11 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
 
 
     mtlc->mtlDevice = [CGDirectDisplayCopyCurrentMetalDevice(displayID) retain];
-    mtlc->mtlTexturePool = [[[MTLTexturePool alloc] initWithDevice:mtlc->mtlDevice] retain];
+    mtlc->mtlTexturePool = [[MTLTexturePool alloc] initWithDevice:mtlc->mtlDevice];
 
-    mtlc->mtlVertexBuffer = [[mtlc->mtlDevice  newBufferWithBytes:verts
+    mtlc->mtlVertexBuffer = [mtlc->mtlDevice newBufferWithBytes:verts
                                                            length:sizeof(verts)
-                                                           options:MTLResourceCPUCacheModeDefaultCache] retain];
+                                                           options:MTLResourceCPUCacheModeDefaultCache];
 
     NSError *error = nil;
 
@@ -192,20 +192,20 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
         NSLog(@"Failed to load library. error %@", error);
         exit(0);
     }
-    id <MTLFunction> vertColFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_col"];
-    id <MTLFunction> vertTxtFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_txt"];
-    id <MTLFunction> vertTxtMatrixFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_txt_matrix"];
-    id <MTLFunction> vertGradFunc = [mtlc->mtlLibrary newFunctionWithName:@"vert_grad"];
-    id <MTLFunction> fragColFunc = [mtlc->mtlLibrary newFunctionWithName:@"frag_col"];
-    id <MTLFunction> fragTxtFunc = [mtlc->mtlLibrary newFunctionWithName:@"frag_txt"];
-    id <MTLFunction> fragGradFunc = [mtlc->mtlLibrary newFunctionWithName:@"frag_grad"];
+    id <MTLFunction> vertColFunc = [[mtlc->mtlLibrary newFunctionWithName:@"vert_col"] autorelease];
+    id <MTLFunction> vertTxtFunc = [[mtlc->mtlLibrary newFunctionWithName:@"vert_txt"] autorelease];
+    id <MTLFunction> vertTxtMatrixFunc = [[mtlc->mtlLibrary newFunctionWithName:@"vert_txt_matrix"] autorelease];
+    id <MTLFunction> vertGradFunc = [[mtlc->mtlLibrary newFunctionWithName:@"vert_grad"] autorelease];
+    id <MTLFunction> fragColFunc = [[mtlc->mtlLibrary newFunctionWithName:@"frag_col"] autorelease];
+    id <MTLFunction> fragTxtFunc = [[mtlc->mtlLibrary newFunctionWithName:@"frag_txt"] autorelease];
+    id <MTLFunction> fragGradFunc = [[mtlc->mtlLibrary newFunctionWithName:@"frag_grad"] autorelease];
 
     // Create depth state.
-    MTLDepthStencilDescriptor *depthDesc = [MTLDepthStencilDescriptor new];
+    MTLDepthStencilDescriptor *depthDesc = [[MTLDepthStencilDescriptor new] autorelease];
     depthDesc.depthCompareFunction = MTLCompareFunctionLess;
     depthDesc.depthWriteEnabled = YES;
 
-    MTLVertexDescriptor *vertDesc = [MTLVertexDescriptor new];
+    MTLVertexDescriptor *vertDesc = [[MTLVertexDescriptor new] autorelease];
     vertDesc.attributes[VertexAttributePosition].format = MTLVertexFormatFloat3;
     vertDesc.attributes[VertexAttributePosition].offset = 0;
     vertDesc.attributes[VertexAttributePosition].bufferIndex = MeshVertexBuffer;
@@ -214,7 +214,7 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
     vertDesc.layouts[MeshVertexBuffer].stepFunction = MTLVertexStepFunctionPerVertex;
 
     // Create pipeline state.
-    MTLRenderPipelineDescriptor *pipelineDesc = [MTLRenderPipelineDescriptor new];
+    MTLRenderPipelineDescriptor *pipelineDesc = [[MTLRenderPipelineDescriptor new] autorelease];
     pipelineDesc.sampleCount = 1;
     pipelineDesc.vertexFunction = vertColFunc;
     pipelineDesc.fragmentFunction = fragColFunc;
@@ -226,7 +226,6 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
         exit(0);
     }
 
-    pipelineDesc = [MTLRenderPipelineDescriptor new];
     pipelineDesc.sampleCount = 1;
     pipelineDesc.vertexFunction = vertGradFunc;
     pipelineDesc.fragmentFunction = fragGradFunc;
@@ -238,7 +237,6 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
         exit(0);
     }
 
-    vertDesc = [MTLVertexDescriptor new];
     vertDesc.attributes[VertexAttributePosition].format = MTLVertexFormatFloat3;
     vertDesc.attributes[VertexAttributePosition].offset = 0;
     vertDesc.attributes[VertexAttributePosition].bufferIndex = MeshVertexBuffer;
@@ -249,7 +247,6 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
     vertDesc.layouts[MeshVertexBuffer].stepRate = 1;
     vertDesc.layouts[MeshVertexBuffer].stepFunction = MTLVertexStepFunctionPerVertex;
     // Create pipeline state.
-    pipelineDesc = [MTLRenderPipelineDescriptor new];
     pipelineDesc.sampleCount = 1;
     pipelineDesc.vertexFunction = vertTxtFunc;
     pipelineDesc.fragmentFunction = fragTxtFunc;
@@ -257,7 +254,18 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
     pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
     mtlc->mtlBlitPipelineState = [mtlc->mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
     if (!mtlc->mtlBlitPipelineState) {
-        NSLog(@"Failed to create pipeline state, error %@", error);
+        NSLog(@"Failed to create blit pipeline state, error %@", error);
+        exit(0);
+    }
+
+    pipelineDesc.sampleCount = 1;
+    pipelineDesc.vertexFunction = vertTxtMatrixFunc;
+    pipelineDesc.fragmentFunction = fragTxtFunc;
+    pipelineDesc.vertexDescriptor = vertDesc;
+    pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    mtlc->mtlBlitMatrixPipelineState = [mtlc->mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc error:&error];
+    if (!mtlc->mtlBlitMatrixPipelineState) {
+        NSLog(@"Failed to create blit with matrix pipeline state, error %@", error);
         exit(0);
     }
 
