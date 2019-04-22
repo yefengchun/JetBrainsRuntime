@@ -103,8 +103,7 @@ fragment half4 frag_txt(
 fragment half4 frag_grad(GradShaderInOut in [[stage_in]],
                          constant GradFrameUniforms& uniforms [[buffer(0)]]) {
     float3 v = float3(in.position.x, in.position.y, 1);
-    float a = (dot(v,uniforms.params)-0.25)*2.0;
-    float b = 1.0 - a;
-    float4 c = b*uniforms.color1 + a*uniforms.color2;
+    float  a = (dot(v,uniforms.params)-0.25)*2.0;
+    float4 c = mix(uniforms.color1, uniforms.color2, a);
     return half4(c);
 }

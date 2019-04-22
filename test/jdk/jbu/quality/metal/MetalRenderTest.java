@@ -76,6 +76,24 @@ public class MetalRenderTest {
         RenderUtil.checkImage(bi, "metal", "lgrad.png");
     }
 
+    @Test
+    public void testLinGradBW() throws Exception {
+        BufferedImage bi = RenderUtil.capture(120, 120,
+                graphics2D -> {
+                    float[] d = {0.0f, 1.0f};
+                    LinearGradientPaint gp =
+                            new LinearGradientPaint(
+                                    new Point2D.Double(10,  10),
+                                    new Point2D.Double( 10, 110),
+                                    d,
+                                    new Color[] {Color.BLACK, Color.WHITE});
+
+                    graphics2D.setPaint(gp);
+                    graphics2D.fillRect(10, 10, 110, 110);
+
+                });
+        RenderUtil.checkImage(bi, "metal", "lgradbw.png");
+    }
 
     @Test
     public void testMetal1() throws Exception {
