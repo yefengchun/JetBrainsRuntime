@@ -460,10 +460,11 @@ MTLBlitLoops_Blit(JNIEnv *env,
                 sy2 = srcInfo.bounds.y2;
             }
 
-            const jboolean useReplaceRegion =
-                    MTLContext_IsBlendingDisabled(mtlc)
+            // NOTE: if (texture) => dest coordinates will always be integers since we only ever do a straight copy from sw to texture.
+            const jboolean useReplaceRegion = texture ||
+                    (MTLContext_IsBlendingDisabled(mtlc)
                     && fabs(dx2 - dx1 - sx2 + sx1) < 0.001f && fabs(dy2 - dy1 - sy2 + sy1) < 0.001f // dimensions are equal (TODO: check that dx1,dy1 is integer)
-                    && !mtlc->useTransform; // TODO: check whether transform is simple translate (and use replaceRegion in this case)
+                    && !mtlc->useTransform); // TODO: check whether transform is simple translate (and use replaceRegion in this case)
             if (useReplaceRegion) {
                 MTLRegion region = MTLRegionMake2D(dx1, dy1, dx2 - dx1, dy2 - dy1);
 #ifdef DEBUG
