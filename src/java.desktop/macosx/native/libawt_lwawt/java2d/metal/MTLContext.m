@@ -458,7 +458,6 @@ MTLRenderPassDescriptor * _createRenderPassDesc(id<MTLTexture> dest) {
     MTLRenderPassColorAttachmentDescriptor * ca = result.colorAttachments[0];
     ca.texture = dest;
     ca.loadAction = MTLLoadActionLoad;
-    ca.clearColor = MTLClearColorMake(0.0f, 0.9f, 0.0f, 1.0f);
     ca.storeAction = MTLStoreActionStore;
     return result;
 }
@@ -488,7 +487,7 @@ static id<MTLCommandBuffer> _getCommandBuffer(MTLContext *mtlc) {
 }
 
 // NOTE: debug parameners will be removed soon
-id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest, int clearRed/*debug param*/) {
+id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
     id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
     if (cb == nil)
         return nil;
@@ -497,15 +496,11 @@ id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture
     if (rpd == nil)
         return nil;
 
-    if (clearRed > 0) {//dbg
-        MTLRenderPassColorAttachmentDescriptor * ca = rpd.colorAttachments[0];
-        ca.loadAction = MTLLoadActionClear;
-        ca.clearColor = MTLClearColorMake(clearRed/255.0f, 0.0f, 0.0f, 1.0f);
-    }
-
     // J2dTraceLn1(J2D_TRACE_VERBOSE, "MTLContext: created render encoder to draw on tex=%p", dest);
-
     id <MTLRenderCommandEncoder> mtlEncoder = [cb renderCommandEncoderWithDescriptor:rpd];
+    if (mtlc->useClip)
+        [mtlEncoder setScissorRect:mtlc->mtlClipRect];
+
 
     // set viewport and pipeline state
     dest = rpd.colorAttachments[0].texture;
@@ -534,11 +529,11 @@ id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture
 }
 
 id<MTLRenderCommandEncoder> MTLContext_CreateRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
-    return _createRenderEncoder(mtlc, dest, -1);
+    return _createRenderEncoder(mtlc, dest);
 }
 
 // NOTE: debug parameners will be removed soon
-id<MTLRenderCommandEncoder> _createSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest, int clearRed/*debug param*/) {
+id<MTLRenderCommandEncoder> _createSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
     id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
     if (cb == nil)
         return nil;
@@ -547,25 +542,16 @@ id<MTLRenderCommandEncoder> _createSamplingEncoder(MTLContext * mtlc, id<MTLText
     if (rpd == nil)
         return nil;
 
-    if (clearRed > 0) {//dbg
-        MTLRenderPassColorAttachmentDescriptor *ca = rpd.colorAttachments[0];
-        ca.loadAction = MTLLoadActionClear;
-        ca.clearColor = MTLClearColorMake(clearRed/255.f, 0.0f, 0.0f, 1.0f);
-    }
-
     id <MTLRenderCommandEncoder> mtlEncoder = [cb renderCommandEncoderWithDescriptor:rpd];
     //J2dTraceLn1(J2D_TRACE_VERBOSE, "MTLContext: created sampling encoder to draw on tex=%p", dest);
 
-    // set viewport and pipeline state
-    MTLViewport vp = {0, 0, dest.width, dest.height, 0, 1};
-    [mtlEncoder setViewport:vp];
     [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:YES isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
 
     return mtlEncoder;
 }
 
 // NOTE: debug parameners will be removed soon
-id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, id<MTLTexture> dest, int clearRed/*debug param*/) {
+id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
     id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
     if (cb == nil)
         return nil;
@@ -574,20 +560,9 @@ id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, i
     if (rpd == nil)
         return nil;
 
-    if (clearRed > 0) {//dbg
-        MTLRenderPassColorAttachmentDescriptor *ca = rpd.colorAttachments[0];
-        ca.loadAction = MTLLoadActionClear;
-        ca.clearColor = MTLClearColorMake(clearRed/255.f, 0.0f, 0.0f, 1.0f);
-    }
-
     id <MTLRenderCommandEncoder> mtlEncoder = [cb renderCommandEncoderWithDescriptor:rpd];
     //J2dTraceLn1(J2D_TRACE_VERBOSE, "MTLContext: created sampling-transform encoder to draw on tex=%p", dest);
-
-    // set viewport and pipeline state
-    MTLViewport vp = {0, 0, dest.width, dest.height, 0, 1};
-    [mtlEncoder setViewport:vp];
     [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:NO isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
-
     [mtlEncoder setVertexBytes:&(mtlc->transform4x4) length:sizeof(mtlc->transform4x4) atIndex:FrameUniformBuffer];
 
     return mtlEncoder;
@@ -595,8 +570,8 @@ id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, i
 
 id<MTLRenderCommandEncoder> MTLContext_CreateSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
     if (mtlc->useTransform)
-        return _createSamplingTransformEncoder(mtlc, dest, -1);
-    return _createSamplingEncoder(mtlc, dest, -1);
+        return _createSamplingTransformEncoder(mtlc, dest);
+    return _createSamplingEncoder(mtlc, dest);
 }
 
 id<MTLBlitCommandEncoder> MTLContext_CreateBlitEncoder(MTLContext *mtlc) {
