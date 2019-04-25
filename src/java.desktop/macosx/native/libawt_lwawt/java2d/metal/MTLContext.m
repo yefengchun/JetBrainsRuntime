@@ -290,14 +290,14 @@ MTLContext_ResetTransform(MTLContext *mtlc)
     mtlc->useTransform = JNI_FALSE;
 }
 
-static void _traceMatrix(simd_float4x4 * mtx) {
+static void traceMatrix(simd_float4x4 * mtx) {
     for (int row = 0; row < 4; ++row) {
         J2dTraceLn4(J2D_TRACE_VERBOSE, "  [%lf %lf %lf %lf]",
                     mtx->columns[0][row], mtx->columns[1][row], mtx->columns[2][row], mtx->columns[3][row]);
     }
 }
 
-static void _setTransform(MTLContext *mtlc, id<MTLTexture> dest,
+static void setTransform(MTLContext *mtlc, id<MTLTexture> dest,
                         jdouble m00, jdouble m10,
                         jdouble m01, jdouble m11,
                         jdouble m02, jdouble m12
@@ -363,7 +363,7 @@ MTLContext_SetTransform(MTLContext *mtlc,
         return;
     }
 
-    _setTransform(mtlc, bmtlsdOps->pTexture, m00, m10, m01, m11, m02, m12);
+    setTransform(mtlc, bmtlsdOps->pTexture, m00, m10, m01, m11, m02, m12);
 }
 
 /**
@@ -445,7 +445,7 @@ JNIEXPORT jstring JNICALL Java_sun_java2d_metal_MTLContext_getMTLIdString
     return NULL;
 }
 
-MTLRenderPassDescriptor * _createRenderPassDesc(id<MTLTexture> dest) {
+static MTLRenderPassDescriptor * createRenderPassDesc(id<MTLTexture> dest) {
     MTLRenderPassDescriptor * result = [MTLRenderPassDescriptor renderPassDescriptor];
     if (result == nil)
         return nil;
@@ -476,7 +476,7 @@ void MTLContext_SetColorInt(MTLContext *mtlc, int pixel) {
     J2dTraceLn5(J2D_TRACE_INFO, "MTLContext_SetColorInt: pixel=%08x [r=%d g=%d b=%d a=%d]", pixel, (pixel >> 16) & (0xFF), (pixel >> 8) & 0xFF, (pixel) & 0xFF, (pixel >> 24) & 0xFF);
 }
 
-static id<MTLCommandBuffer> _getCommandBuffer(MTLContext *mtlc) {
+static id<MTLCommandBuffer> getCommandBuffer(MTLContext *mtlc) {
     if (mtlc == NULL)
         return nil;
     if (mtlc->mtlCommandBuffer == nil) {
@@ -486,18 +486,21 @@ static id<MTLCommandBuffer> _getCommandBuffer(MTLContext *mtlc) {
     return mtlc->mtlCommandBuffer;
 }
 
-// NOTE: debug parameners will be removed soon
-id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
-    id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
+static id<MTLRenderCommandEncoder> createEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
+    id<MTLCommandBuffer> cb = getCommandBuffer(mtlc);
     if (cb == nil)
         return nil;
 
-    MTLRenderPassDescriptor * rpd = _createRenderPassDesc(dest);
+    MTLRenderPassDescriptor * rpd = createRenderPassDesc(dest);
     if (rpd == nil)
         return nil;
 
     // J2dTraceLn1(J2D_TRACE_VERBOSE, "MTLContext: created render encoder to draw on tex=%p", dest);
-    id <MTLRenderCommandEncoder> mtlEncoder = [cb renderCommandEncoderWithDescriptor:rpd];
+    return [cb renderCommandEncoderWithDescriptor:rpd];
+}
+
+id<MTLRenderCommandEncoder> MTLContext_CreateRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
+    id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
     if (mtlc->useClip)
         [mtlEncoder setScissorRect:mtlc->mtlClipRect];
 
@@ -519,49 +522,25 @@ id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture
         [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getRenderPipelineState:YES]];
 
         struct GradFrameUniforms uf = {
-            {mtlc->p0, mtlc->p1, mtlc->p3},
-            RGBA_TO_V4(mtlc->pixel1),
-            RGBA_TO_V4(mtlc->pixel2)};
+                {mtlc->p0, mtlc->p1, mtlc->p3},
+                RGBA_TO_V4(mtlc->pixel1),
+                RGBA_TO_V4(mtlc->pixel2)};
 
         [mtlEncoder setFragmentBytes: &uf length:sizeof(uf) atIndex:0];
     }
     return mtlEncoder;
 }
 
-id<MTLRenderCommandEncoder> MTLContext_CreateRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
-    return _createRenderEncoder(mtlc, dest);
-}
-
-// NOTE: debug parameners will be removed soon
-id<MTLRenderCommandEncoder> _createSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
-    id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
-    if (cb == nil)
-        return nil;
-
-    MTLRenderPassDescriptor * rpd = _createRenderPassDesc(dest);
-    if (rpd == nil)
-        return nil;
-
-    id <MTLRenderCommandEncoder> mtlEncoder = [cb renderCommandEncoderWithDescriptor:rpd];
-    //J2dTraceLn1(J2D_TRACE_VERBOSE, "MTLContext: created sampling encoder to draw on tex=%p", dest);
-
+id<MTLRenderCommandEncoder> createSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
+    id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
     [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:YES isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
 
     return mtlEncoder;
 }
 
-// NOTE: debug parameners will be removed soon
-id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
-    id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
-    if (cb == nil)
-        return nil;
+id<MTLRenderCommandEncoder> createSamplingTransformEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
+    id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
 
-    MTLRenderPassDescriptor * rpd = _createRenderPassDesc(dest);
-    if (rpd == nil)
-        return nil;
-
-    id <MTLRenderCommandEncoder> mtlEncoder = [cb renderCommandEncoderWithDescriptor:rpd];
-    //J2dTraceLn1(J2D_TRACE_VERBOSE, "MTLContext: created sampling-transform encoder to draw on tex=%p", dest);
     [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:NO isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
     [mtlEncoder setVertexBytes:&(mtlc->transform4x4) length:sizeof(mtlc->transform4x4) atIndex:FrameUniformBuffer];
 
@@ -570,12 +549,12 @@ id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, i
 
 id<MTLRenderCommandEncoder> MTLContext_CreateSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
     if (mtlc->useTransform)
-        return _createSamplingTransformEncoder(mtlc, dest);
-    return _createSamplingEncoder(mtlc, dest);
+        return createSamplingTransformEncoder(mtlc, dest);
+    return createSamplingEncoder(mtlc, dest);
 }
 
 id<MTLBlitCommandEncoder> MTLContext_CreateBlitEncoder(MTLContext *mtlc) {
-    id<MTLCommandBuffer> cb = _getCommandBuffer(mtlc);
+    id<MTLCommandBuffer> cb = getCommandBuffer(mtlc);
     return cb == nil ? nil : [cb blitCommandEncoder];
 }
 
