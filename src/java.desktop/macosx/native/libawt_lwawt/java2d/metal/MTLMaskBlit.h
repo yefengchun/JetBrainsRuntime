@@ -28,7 +28,7 @@
 
 #include "MTLContext.h"
 
-void MTLMaskBlit_MaskBlit(JNIEnv *env, MTLContext *mtlc,
+void MTLMaskBlit_MaskBlit(JNIEnv *env, MTLContext *mtlc, BMTLSDOps * dstOps,
                           jint dstx, jint dsty,
                           jint width, jint height,
                           void *pPixels);

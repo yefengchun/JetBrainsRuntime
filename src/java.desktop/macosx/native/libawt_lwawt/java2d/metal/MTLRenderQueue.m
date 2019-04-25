@@ -181,7 +181,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint y1 = NEXT_INT(b);
                 jint x2 = NEXT_INT(b);
                 jint y2 = NEXT_INT(b);
-                MTLRenderer_DrawLine(mtlc, x1, y1, x2, y2);
+                MTLRenderer_DrawLine(mtlc, dstOps, x1, y1, x2, y2);
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_DRAW_RECT:
@@ -190,7 +190,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint y = NEXT_INT(b);
                 jint w = NEXT_INT(b);
                 jint h = NEXT_INT(b);
-                MTLRenderer_DrawRect(mtlc, x, y, w, h);
+                MTLRenderer_DrawRect(mtlc, dstOps, x, y, w, h);
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_DRAW_POLY:
@@ -201,7 +201,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint transY       = NEXT_INT(b);
                 jint *xPoints = (jint *)b;
                 jint *yPoints = ((jint *)b) + nPoints;
-                MTLRenderer_DrawPoly(mtlc, nPoints, isClosed, transX, transY, xPoints, yPoints);
+                MTLRenderer_DrawPoly(mtlc, dstOps, nPoints, isClosed, transX, transY, xPoints, yPoints);
                 SKIP_BYTES(b, nPoints * BYTES_PER_POLY_POINT);
             }
             break;
@@ -217,7 +217,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
         case sun_java2d_pipe_BufferedOpCodes_DRAW_SCANLINES:
             {
                 jint count = NEXT_INT(b);
-                MTLRenderer_DrawScanlines(mtlc, count, (jint *)b);
+                MTLRenderer_DrawScanlines(mtlc, dstOps, count, (jint *)b);
 
                 SKIP_BYTES(b, count * BYTES_PER_SCANLINE);
             }
@@ -233,7 +233,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jfloat lwr21 = NEXT_FLOAT(b);
                 jfloat lwr12 = NEXT_FLOAT(b);
 
-                MTLRenderer_DrawParallelogram(mtlc,
+                MTLRenderer_DrawParallelogram(mtlc, dstOps,
                                               x11, y11,
                                               dx21, dy21,
                                               dx12, dy12,
@@ -266,13 +266,13 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint y = NEXT_INT(b);
                 jint w = NEXT_INT(b);
                 jint h = NEXT_INT(b);
-                MTLRenderer_FillRect(mtlc, x, y, w, h);
+                MTLRenderer_FillRect(mtlc, dstOps, x, y, w, h);
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_FILL_SPANS:
             {
                 jint count = NEXT_INT(b);
-                MTLRenderer_FillSpans(mtlc, count, (jint *)b);
+                MTLRenderer_FillSpans(mtlc, dstOps, count, (jint *)b);
                 SKIP_BYTES(b, count * BYTES_PER_SPAN);
             }
             break;
@@ -284,7 +284,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jfloat dy21 = NEXT_FLOAT(b);
                 jfloat dx12 = NEXT_FLOAT(b);
                 jfloat dy12 = NEXT_FLOAT(b);
-                MTLRenderer_FillParallelogram(mtlc,
+                MTLRenderer_FillParallelogram(mtlc, dstOps,
                                               x11, y11,
                                               dx21, dy21,
                                               dx12, dy12);
@@ -421,7 +421,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint maskscan = NEXT_INT(b);
                 jint masklen  = NEXT_INT(b);
                 unsigned char *pMask = (masklen > 0) ? b : NULL;
-                MTLMaskFill_MaskFill(mtlc, x, y, w, h,
+                MTLMaskFill_MaskFill(mtlc, dstOps, x, y, w, h,
                                      maskoff, maskscan, masklen, pMask);
                 SKIP_BYTES(b, masklen);
             }
@@ -435,7 +435,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint width    = NEXT_INT(b);
                 jint height   = NEXT_INT(b);
                 jint masklen  = width * height * sizeof(jint);
-                MTLMaskBlit_MaskBlit(env, mtlc,
+                MTLMaskBlit_MaskBlit(env, mtlc, dstOps,
                                      dstx, dsty, width, height, b);
                 SKIP_BYTES(b, masklen);
             }
@@ -448,7 +448,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint y1 = NEXT_INT(b);
                 jint x2 = NEXT_INT(b);
                 jint y2 = NEXT_INT(b);
-                MTLContext_SetRectClip(mtlc, dstOps, x1, y1, x2, y2);
+                MTLContext_SetRectClip(mtlc, x1, y1, x2, y2);
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_BEGIN_SHAPE_CLIP:
@@ -459,7 +459,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
         case sun_java2d_pipe_BufferedOpCodes_SET_SHAPE_CLIP_SPANS:
             {
                 jint count = NEXT_INT(b);
-                MTLRenderer_FillSpans(mtlc, count, (jint *)b);
+                MTLRenderer_FillSpans(mtlc, dstOps, count, (jint *)b);
                 SKIP_BYTES(b, count * BYTES_PER_SPAN);
             }
             break;
@@ -521,7 +521,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 }
 
                 dstOps = (BMTLSDOps *)jlong_to_ptr(pDst);
-                MTLContext_SetSurfaces(env, pSrc, pDst);
+                mtlc = MTLContext_SetSurfaces(env, pSrc, pDst);
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_SCRATCH_SURFACE:

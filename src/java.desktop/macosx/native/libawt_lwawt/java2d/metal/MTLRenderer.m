@@ -39,51 +39,6 @@
 #include "MTLUtils.h"
 #import "MTLLayer.h"
 
-void MTLRenderer_FillParallelogramMetal(
-    MTLContext* mtlc, id<MTLTexture> dest, jfloat x, jfloat y, jfloat dx1, jfloat dy1, jfloat dx2, jfloat dy2)
-{
-    if (mtlc == NULL || dest == nil)
-        return;
-
-    J2dTraceLn7(J2D_TRACE_INFO,
-                "MTLRenderer_FillParallelogramMetal "
-                "(x=%6.2f y=%6.2f "
-                "dx1=%6.2f dy1=%6.2f "
-                "dx2=%6.2f dy2=%6.2f dst tex=%p)",
-                x, y,
-                dx1, dy1,
-                dx2, dy2, dest);
-
-    struct Vertex verts[PGRAM_VERTEX_COUNT] = {
-    { {(2.0*x/dest.width) - 1.0,
-       2.0*(1.0 - y/dest.height) - 1.0, 0.0}},
-
-    { {2.0*(x+dx1)/dest.width - 1.0,
-      2.0*(1.0 - (y+dy1)/dest.height) - 1.0, 0.0}},
-
-    { {2.0*(x+dx2)/dest.width - 1.0,
-      2.0*(1.0 - (y+dy2)/dest.height) - 1.0, 0.0}},
-
-    { {2.0*(x+dx1)/dest.width - 1.0,
-      2.0*(1.0 - (y+dy1)/dest.height) - 1.0, 0.0}},
-
-    { {2.0*(x + dx1 + dx2)/dest.width - 1.0,
-      2.0*(1.0 - (y+ dy1 + dy2)/dest.height) - 1.0, 0.0}},
-
-    { {2.0*(x+dx2)/dest.width - 1.0,
-      2.0*(1.0 - (y+dy2)/dest.height) - 1.0, 0.0},
-    }};
-
-    // Encode render command.
-    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
-    if (mtlEncoder == nil)
-        return;
-
-    [mtlEncoder setVertexBytes:verts length:sizeof(verts) atIndex:MeshVertexBuffer];
-    [mtlEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount: PGRAM_VERTEX_COUNT];
-    [mtlEncoder endEncoding];
-}
-
 /**
  * Note: Some of the methods in this file apply a "magic number"
  * translation to line segments.  The OpenGL specification lays out the
@@ -111,19 +66,21 @@ void MTLRenderer_FillParallelogramMetal(
  * hardware to ensure consistent rendering everywhere.
  */
 
-void MTLRenderer_DrawLineMetal(MTLContext *mtlc, id<MTLTexture> dest, jfloat x1, jfloat y1, jfloat x2, jfloat y2) {
-    if (mtlc == NULL || dest == nil)
+void MTLRenderer_DrawLine(MTLContext *mtlc, BMTLSDOps * dstOps, jint x1, jint y1, jint x2, jint y2) {
+    if (mtlc == NULL || dstOps == NULL || dstOps->pTexture == NULL) {
+        J2dTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawLine: dest is null");
         return;
+    }
 
-    J2dTraceLn5(J2D_TRACE_INFO, "MTLRenderer_DrawLineMetal (x1=%1.2f y1=%1.2f x2=%1.2f y2=%1.2f), dst tex=%p", x1, y1, x2, y2, dest);
+    J2dTraceLn5(J2D_TRACE_INFO, "MTLRenderer_DrawLine (x1=%1.2f y1=%1.2f x2=%1.2f y2=%1.2f), dst tex=%p", x1, y1, x2, y2, dstOps->pTexture);
 
-    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
+    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dstOps->pTexture);
     if (mtlEncoder == nil)
         return;
 
     struct Vertex verts[2] = {
-            {{MTLUtils_normalizeX(dest, x1), MTLUtils_normalizeY(dest, y1), 0.0}},
-            {{MTLUtils_normalizeX(dest, x2), MTLUtils_normalizeY(dest, y2), 0.0}}
+            {{MTLUtils_normalizeX(dstOps->pTexture, x1), MTLUtils_normalizeY(dstOps->pTexture, y1), 0.0}},
+            {{MTLUtils_normalizeX(dstOps->pTexture, x2), MTLUtils_normalizeY(dstOps->pTexture, y2), 0.0}}
     };
 
     [mtlEncoder setVertexBytes:verts length:sizeof(verts) atIndex:MeshVertexBuffer];
@@ -131,22 +88,14 @@ void MTLRenderer_DrawLineMetal(MTLContext *mtlc, id<MTLTexture> dest, jfloat x1,
     [mtlEncoder endEncoding];
 }
 
-void MTLRenderer_DrawLine(MTLContext *mtlc, jint x1, jint y1, jint x2, jint y2) {
-    BMTLSDOps *dstOps = MTLRenderQueue_GetCurrentDestination();
-    if (dstOps == NULL || dstOps->privOps == NULL) {
-        J2dTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawLine: dest is null");
+void MTLRenderer_DrawRect(MTLContext *mtlc, BMTLSDOps * dstOps, jint x, jint y, jint w, jint h) {
+    if (mtlc == NULL || dstOps == NULL || dstOps->pTexture == NULL) {
+        J2dTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawRect: dest is null");
         return;
     }
 
-    MTLSDOps *dstCGLOps = (MTLSDOps *)dstOps->privOps;
-    MTLRenderer_DrawLineMetal(dstCGLOps->configInfo->context, dstOps->pTexture, x1, y1, x2, y2);
-}
-
-void MTLRenderer_DrawRectMetal(MTLContext *mtlc, id<MTLTexture> dest, jint x, jint y, jint w, jint h) {
-    if (mtlc == NULL || dest == nil)
-        return;
-
-    J2dTraceLn5(J2D_TRACE_INFO, "MTLRenderer_DrawRectMetal (x=%d y=%d w=%d h=%d), dst tex=%p", x, y, w, h, dest);
+    id<MTLTexture> dest = dstOps->pTexture;
+    J2dTraceLn5(J2D_TRACE_INFO, "MTLRenderer_DrawRect (x=%d y=%d w=%d h=%d), dst tex=%p", x, y, w, h, dest);
 
     // TODO: use DrawParallelogram(x, y, w, h, lw=1, lh=1)
     id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
@@ -166,17 +115,6 @@ void MTLRenderer_DrawRectMetal(MTLContext *mtlc, id<MTLTexture> dest, jint x, ji
     [mtlEncoder endEncoding];
 }
 
-void MTLRenderer_DrawRect(MTLContext *mtlc, jint x, jint y, jint w, jint h) {
-    BMTLSDOps *bmtldst = MTLRenderQueue_GetCurrentDestination();
-    if (bmtldst == NULL || bmtldst->privOps == NULL) {
-        J2dTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawRect: dest is null");
-        return;
-    }
-
-    MTLSDOps *dstCGLOps = (MTLSDOps *)bmtldst->privOps;
-    MTLRenderer_DrawRectMetal(dstCGLOps->configInfo->context, bmtldst->pTexture, x, y, w, h);
-}
-
 void _tracePoints(jint nPoints, jint *xPoints, jint *yPoints) {
     for (int i = 0; i < nPoints; i++)
         J2dTraceLn2(J2D_TRACE_INFO, "\t(%d, %d)", *(xPoints++), *(yPoints++));
@@ -190,7 +128,7 @@ void _fillVertex(struct Vertex * vertex, int x, int y, int destW, int destH) {
     vertex->position[2] = 0;
 }
 
-void MTLRenderer_DrawPoly(MTLContext *mtlc,
+void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
                      jint nPoints, jint isClosed,
                      jint transX, jint transY,
                      jint *xPoints, jint *yPoints)
@@ -202,16 +140,8 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc,
         return;
     }
 
-    BMTLSDOps *dstOps = MTLRenderQueue_GetCurrentDestination();
-    if (dstOps == NULL || dstOps->privOps == NULL) {
-        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawPoly: current dest is null");
-        return;
-    }
-
-    MTLSDOps *dstCGLOps = (MTLSDOps *) dstOps->privOps;
-    MTLContext* ctx = dstCGLOps->configInfo->context;
-    if (ctx == NULL) {
-        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawPoly: current mtlContext os null");
+    if (mtlc == NULL || dstOps == NULL || dstOps->pTexture == NULL) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_DrawPoly: dest is null");
         return;
     }
 
@@ -248,7 +178,7 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc,
         }
 
         nPoints -= chunkSize;
-        id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(ctx, dstOps->pTexture);
+        id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dstOps->pTexture);
         if (mtlEncoder == nil)
             return;
 
@@ -281,7 +211,7 @@ Java_sun_java2d_metal_MTLRenderer_drawPoly
 }
 
 void
-MTLRenderer_DrawScanlines(MTLContext *mtlc,
+MTLRenderer_DrawScanlines(MTLContext *mtlc, BMTLSDOps * dstOps,
                           jint scanlineCount, jint *scanlines)
 {
     //TODO
@@ -290,7 +220,7 @@ MTLRenderer_DrawScanlines(MTLContext *mtlc,
 }
 
 void
-MTLRenderer_FillRect(MTLContext *mtlc, jint x, jint y, jint w, jint h)
+MTLRenderer_FillRect(MTLContext *mtlc, BMTLSDOps * dstOps, jint x, jint y, jint w, jint h)
 {
     //TODO
     J2dTraceNotImplPrimitive("MTLRenderer_FillRect");
@@ -300,18 +230,11 @@ MTLRenderer_FillRect(MTLContext *mtlc, jint x, jint y, jint w, jint h)
 const int SPAN_BUF_SIZE=64;
 
 void
-MTLRenderer_FillSpans(MTLContext *mtlc, jint spanCount, jint *spans)
+MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount, jint *spans)
 {
     J2dTraceLn(J2D_TRACE_INFO, "MTLRenderer_FillSpans");
-    BMTLSDOps *dstOps = MTLRenderQueue_GetCurrentDestination();
-    if (dstOps == NULL || dstOps->privOps == NULL) {
-        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_FillSpans: current dest is null");
-        return;
-    }
-    MTLSDOps *dstCGLOps = (MTLSDOps *) dstOps->privOps;
-    MTLContext* ctx = dstCGLOps->configInfo->context;
-    if (ctx == NULL) {
-        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_FillSpans: current mtlContext os null");
+    if (mtlc == NULL || dstOps == NULL || dstOps->pTexture == NULL) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_FillSpans: dest is null");
         return;
     }
 
@@ -332,7 +255,7 @@ MTLRenderer_FillSpans(MTLContext *mtlc, jint spanCount, jint *spans)
         spanCount -= sc;
 
         id<MTLTexture> dest = dstOps->pTexture;
-        id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(ctx, dest);
+        id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
         if (mtlEncoder == nil)
             return;
 
@@ -371,32 +294,60 @@ MTLRenderer_FillSpans(MTLContext *mtlc, jint spanCount, jint *spans)
 }
 
 void
-MTLRenderer_FillParallelogram(MTLContext *mtlc,
+MTLRenderer_FillParallelogram(MTLContext *mtlc, BMTLSDOps * dstOps,
                               jfloat fx11, jfloat fy11,
                               jfloat dx21, jfloat dy21,
                               jfloat dx12, jfloat dy12)
 {
     J2dTracePrimitive("MTLRenderer_FillParallelogram");
 
-    BMTLSDOps *dstOps = MTLRenderQueue_GetCurrentDestination();
-    if (dstOps == NULL || dstOps->privOps == NULL) {
+    if (mtlc == NULL || dstOps == NULL || dstOps->pTexture == NULL) {
         J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_FillParallelogram: current dest is null");
         return;
     }
-    MTLSDOps *dstCGLOps = (MTLSDOps *) dstOps->privOps;
-    MTLContext* ctx = dstCGLOps->configInfo->context;
-    if (ctx == NULL) {
-        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_FillParallelogram: current mtlContext os null");
-        return;
-    }
 
-     MTLRenderer_FillParallelogramMetal(
-        dstCGLOps->configInfo->context, dstOps->pTexture,
-        fx11, fy11, dx21, dy21, dx12, dy12);
+    id<MTLTexture> dest = dstOps->pTexture;
+    J2dTraceLn7(J2D_TRACE_INFO,
+                "MTLRenderer_FillParallelogram "
+                "(x=%6.2f y=%6.2f "
+                "dx1=%6.2f dy1=%6.2f "
+                "dx2=%6.2f dy2=%6.2f dst tex=%p)",
+                fx11, fy11,
+                dx21, dy21,
+                dx12, dy12, dest);
+
+    struct Vertex verts[PGRAM_VERTEX_COUNT] = {
+            { {(2.0*fx11/dest.width) - 1.0,
+                      2.0*(1.0 - fy11/dest.height) - 1.0, 0.0}},
+
+            { {2.0*(fx11+dx21)/dest.width - 1.0,
+                      2.0*(1.0 - (fy11+dy21)/dest.height) - 1.0, 0.0}},
+
+            { {2.0*(fx11+dx12)/dest.width - 1.0,
+                      2.0*(1.0 - (fy11+dy12)/dest.height) - 1.0, 0.0}},
+
+            { {2.0*(fx11+dx21)/dest.width - 1.0,
+                      2.0*(1.0 - (fy11+dy21)/dest.height) - 1.0, 0.0}},
+
+            { {2.0*(fx11 + dx21 + dx12)/dest.width - 1.0,
+                      2.0*(1.0 - (fy11+ dy21 + dy12)/dest.height) - 1.0, 0.0}},
+
+            { {2.0*(fx11+dx12)/dest.width - 1.0,
+                      2.0*(1.0 - (fy11+dy12)/dest.height) - 1.0, 0.0},
+            }};
+
+    // Encode render command.
+    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
+    if (mtlEncoder == nil)
+        return;
+
+    [mtlEncoder setVertexBytes:verts length:sizeof(verts) atIndex:MeshVertexBuffer];
+    [mtlEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount: PGRAM_VERTEX_COUNT];
+    [mtlEncoder endEncoding];
 }
 
 void
-MTLRenderer_DrawParallelogram(MTLContext *mtlc,
+MTLRenderer_DrawParallelogram(MTLContext *mtlc, BMTLSDOps * dstOps,
                               jfloat fx11, jfloat fy11,
                               jfloat dx21, jfloat dy21,
                               jfloat dx12, jfloat dy12,
@@ -638,33 +589,6 @@ MTLRenderer_DisableAAParallelogramProgram()
     //TODO
     J2dTraceNotImplPrimitive("MTLRenderer_DisableAAParallelogramProgram");
     J2dTraceLn(J2D_TRACE_INFO, "MTLRenderer_DisableAAParallelogramProgram");
-}
-
-void debugDraw(MTLContext *ctx, id<MTLTexture> dst, int red/*othrewise blue*/, int freq) {
-    J2dTraceLn1(J2D_TRACE_VERBOSE, "draw debug onto dst tex=%p", dst);
-    MTLContext_SetColor(ctx, red > 0 ? red : 0, 0, red <= 0 ? 255 : 0, 255);
-    id <MTLRenderCommandEncoder> encoder = MTLContext_CreateRenderEncoder(ctx, dst);
-    const int w = dst.width;
-    const int h = dst.height;
-    int x = 2;
-    int y = 2;
-    do {
-        struct Vertex vvv[2] = {
-                {{MTLUtils_normalizeX(dst,x), MTLUtils_normalizeY(dst, y), 0.0}},
-                {{MTLUtils_normalizeX(dst, dst.width - x), MTLUtils_normalizeY(dst, dst.height - y), 0.0}},
-        };
-        [encoder setVertexBytes:vvv length:sizeof(vvv) atIndex:MeshVertexBuffer];
-        [encoder drawPrimitives:MTLPrimitiveTypeLine vertexStart:0 vertexCount:2];
-
-        if (freq == 0)
-            break;
-        if (freq > 0)
-            x += (w - 3)/freq;
-        else
-            y += (h - 3)/freq;
-    } while (x < w && y < h);
-
-    [encoder endEncoding];
 }
 
 #endif /* !HEADLESS */

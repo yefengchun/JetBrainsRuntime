@@ -170,7 +170,7 @@ MTLContext_ResetClip(MTLContext *mtlc)
  * Sets the Metal scissor bounds to the provided rectangular clip bounds.
  */
 void
-MTLContext_SetRectClip(MTLContext *mtlc, BMTLSDOps *dstOps,
+MTLContext_SetRectClip(MTLContext *mtlc,
                        jint x1, jint y1, jint x2, jint y2)
 {
     //TODO

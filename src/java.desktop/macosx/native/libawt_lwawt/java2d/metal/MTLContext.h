@@ -130,7 +130,7 @@ typedef struct {
  */
 MTLContext *MTLContext_SetSurfaces(JNIEnv *env, jlong pSrc, jlong pDst);
 void MTLContext_ResetClip(MTLContext *mtlc);
-void MTLContext_SetRectClip(MTLContext *mtlc, BMTLSDOps *dstOps,
+void MTLContext_SetRectClip(MTLContext *mtlc,
                             jint x1, jint y1, jint x2, jint y2);
 void MTLContext_BeginShapeClip(MTLContext *mtlc);
 void MTLContext_EndShapeClip(MTLContext *mtlc, BMTLSDOps *dstOps);

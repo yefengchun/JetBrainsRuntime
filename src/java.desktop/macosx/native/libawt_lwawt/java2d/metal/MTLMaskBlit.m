@@ -38,7 +38,7 @@
  *         these are rather fragile assumptions, and should be cleaned up...
  */
 void
-MTLMaskBlit_MaskBlit(JNIEnv *env, MTLContext *mtlc,
+MTLMaskBlit_MaskBlit(JNIEnv *env, MTLContext *mtlc, BMTLSDOps * dstOps,
                      jint dstx, jint dsty,
                      jint width, jint height,
                      void *pPixels)
