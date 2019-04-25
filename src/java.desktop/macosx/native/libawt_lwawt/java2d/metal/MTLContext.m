@@ -415,8 +415,8 @@ MTLContext_DestroyContextResources(MTLContext *mtlc)
     [mtlc->mtlTexturePool release];
     mtlc->mtlTexturePool = nil;
 
-    [mtlc->mtlLibrary release];
-    mtlc->mtlLibrary = nil;
+    [mtlc->mtlPipelineStateStorage release];
+    mtlc->mtlPipelineStateStorage = nil;
 
     [mtlc->mtlVertexBuffer release];
     mtlc->mtlVertexBuffer = nil;
@@ -426,15 +426,6 @@ MTLContext_DestroyContextResources(MTLContext *mtlc)
 
     [mtlc->mtlDevice release];
     mtlc->mtlDevice = nil;
-
-    [mtlc->mtlPipelineState release];
-    mtlc->mtlPipelineState = nil;
-    [mtlc->mtlBlitPipelineState release];
-    mtlc->mtlBlitPipelineState = nil;
-    [mtlc->mtlBlitMatrixPipelineState release];
-    mtlc->mtlBlitMatrixPipelineState = nil;
-    [mtlc->mtlBlitMatrixSrcOverPipelineState release];
-    mtlc->mtlBlitMatrixSrcOverPipelineState = nil;
 }
 
 /*
@@ -524,17 +515,13 @@ id<MTLRenderCommandEncoder> _createRenderEncoder(MTLContext *mtlc, id<MTLTexture
 
     if (mtlc->compState == sun_java2d_SunGraphics2D_PAINT_ALPHACOLOR) {
         // set pipeline state
-        [mtlEncoder setRenderPipelineState:mtlc->mtlPipelineState];
-
-        if (mtlc->useClip)
-            [mtlEncoder setScissorRect:mtlc->mtlClipRect];
-
+        [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getRenderPipelineState:NO]];
         struct FrameUniforms uf = {RGBA_TO_V4(mtlc->mtlColor)};
         [mtlEncoder setVertexBytes:&uf length:sizeof(uf) atIndex:FrameUniformBuffer];
 
     } else if (mtlc->compState == sun_java2d_SunGraphics2D_PAINT_GRADIENT) {
         // set viewport and pipeline state
-        [mtlEncoder setRenderPipelineState:mtlc->mtlGradPipelineState];
+        [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getRenderPipelineState:YES]];
 
         struct GradFrameUniforms uf = {
             {mtlc->p0, mtlc->p1, mtlc->p3},
@@ -572,14 +559,7 @@ id<MTLRenderCommandEncoder> _createSamplingEncoder(MTLContext * mtlc, id<MTLText
     // set viewport and pipeline state
     MTLViewport vp = {0, 0, dest.width, dest.height, 0, 1};
     [mtlEncoder setViewport:vp];
-    if (mtlc->alphaCompositeRule == RULE_Src)
-        [mtlEncoder setRenderPipelineState:mtlc->mtlBlitPipelineState];
-    else if (mtlc->alphaCompositeRule == RULE_SrcOver)
-        [mtlEncoder setRenderPipelineState:mtlc->mtlBlitSrcOverPipelineState];
-    else {
-        J2dTraceLn2(J2D_TRACE_ERROR, "MTLContext: alpha-composite rule %d isn't implemented (draw on %p)", mtlc->alphaCompositeRule, dest);
-        [mtlEncoder setRenderPipelineState:mtlc->mtlBlitPipelineState];
-    }
+    [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:YES isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
 
     return mtlEncoder;
 }
@@ -606,14 +586,7 @@ id<MTLRenderCommandEncoder> _createSamplingTransformEncoder(MTLContext * mtlc, i
     // set viewport and pipeline state
     MTLViewport vp = {0, 0, dest.width, dest.height, 0, 1};
     [mtlEncoder setViewport:vp];
-    if (mtlc->alphaCompositeRule == RULE_Src)
-        [mtlEncoder setRenderPipelineState:mtlc->mtlBlitMatrixPipelineState];
-    else if (mtlc->alphaCompositeRule == RULE_SrcOver)
-        [mtlEncoder setRenderPipelineState:mtlc->mtlBlitMatrixSrcOverPipelineState];
-    else {
-        J2dTraceLn2(J2D_TRACE_ERROR, "MTLContext: alpha-composite rule %d isn't implemented (draw on %p with transform)", mtlc->alphaCompositeRule, dest);
-        [mtlEncoder setRenderPipelineState:mtlc->mtlBlitMatrixPipelineState];
-    }
+    [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:NO isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
 
     [mtlEncoder setVertexBytes:&(mtlc->transform4x4) length:sizeof(mtlc->transform4x4) atIndex:FrameUniformBuffer];
 

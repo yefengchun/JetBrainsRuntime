@@ -36,6 +36,7 @@
 #include "j2d_md.h"
 #include "MTLSurfaceDataBase.h"
 #include "MTLTexturePool.h"
+#include "MTLPipelineStatesStorage.h"
 
 /**
  * The MTLBlendRule structure encapsulates the two enumerated values that
@@ -99,13 +100,6 @@ typedef struct {
     jboolean   vertexCacheEnabled;
 
     id<MTLDevice>               mtlDevice;
-    id<MTLLibrary>              mtlLibrary;
-    id<MTLRenderPipelineState>  mtlPipelineState;
-    id<MTLRenderPipelineState>  mtlBlitPipelineState;
-    id<MTLRenderPipelineState>  mtlBlitMatrixPipelineState;
-    id<MTLRenderPipelineState>  mtlBlitSrcOverPipelineState;
-    id<MTLRenderPipelineState>  mtlBlitMatrixSrcOverPipelineState; // TODO: implement PipelineStateFactory
-    id<MTLRenderPipelineState>  mtlGradPipelineState;
     id<MTLCommandQueue>         mtlCommandQueue;
     id<MTLCommandBuffer>        mtlCommandBuffer;
     id<MTLBuffer>               mtlVertexBuffer;
@@ -113,6 +107,7 @@ typedef struct {
     MTLScissorRect              mtlClipRect;
     jboolean                    useClip;
 
+    MTLPipelineStatesStorage *  mtlPipelineStateStorage;
     MTLTexturePool*             mtlTexturePool;
 } MTLContext;
 

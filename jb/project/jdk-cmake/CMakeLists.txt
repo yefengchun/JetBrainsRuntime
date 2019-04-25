@@ -924,6 +924,8 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
             ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/metal/MTLUtils.m
             ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/metal/MTLTexturePool.m
             ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/metal/MTLTexturePool.m
+            ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/metal/MTLPipelineStatesStorage.m
+            ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/metal/MTLPipelineStatesStorage.h
             ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/opengl/CGLSurfaceData.h
             ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/opengl/J2D_GL/cglext.h
             ../../../src/java.desktop/macosx/native/libawt_lwawt/java2d/opengl/CGLGraphicsConfig.h
