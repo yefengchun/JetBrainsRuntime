@@ -482,7 +482,7 @@ static id<MTLCommandBuffer> _getCommandBuffer(MTLContext *mtlc) {
         return nil;
     if (mtlc->mtlCommandBuffer == nil) {
         // NOTE: Command queues are thread-safe and allow multiple outstanding command buffers to be encoded simultaneously.
-        mtlc->mtlCommandBuffer = [[mtlc->mtlCommandQueue commandBuffer] retain];// released in [layer blitTexture]
+        mtlc->mtlCommandBuffer = [mtlc->mtlCommandQueue commandBuffer];// released in [layer blitTexture]
     }
     return mtlc->mtlCommandBuffer;
 }
