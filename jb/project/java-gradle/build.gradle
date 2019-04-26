@@ -103,24 +103,30 @@ if (OperatingSystem.current().isWindows()) {
     if (cyg_make_cmd.exists()) make_cmd = cyg_make_cmd.absolutePath
 }
 def test_run = false
-task make_images << {
-    if (!test_run) {
-        def pb = new ProcessBuilder().command(make_cmd.toString(), "-C", buildDir.absolutePath, "images")
+task make_images {
+    doLast {
+        if (!test_run) {
+            def pb = new ProcessBuilder().command(make_cmd.toString(), "-C", buildDir.absolutePath, "images")
+            def proc = pb.redirectErrorStream(true).start()
+            proc.inputStream.eachLine { println it }
+            assert proc.waitFor() == 0
+        }
+    }
+}
+
+task make_clean {
+    doLast {
+        def pb = new ProcessBuilder().command(make_cmd.toString(), "-C", buildDir.absolutePath, "clean")
         def proc = pb.redirectErrorStream(true).start()
         proc.inputStream.eachLine { println it }
         assert proc.waitFor() == 0
     }
 }
 
-task make_clean << {
-    def pb = new ProcessBuilder().command(make_cmd.toString(), "-C", buildDir.absolutePath, "clean")
-    def proc = pb.redirectErrorStream(true).start()
-    proc.inputStream.eachLine {println it}
-    assert proc.waitFor() == 0
-}
-
-task run_test << {
-    test_run = true
+task run_test {
+    doLast {
+        test_run = true
+    }
 }
 
 tasks.cleanTest.dependsOn tasks.run_test
