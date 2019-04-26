@@ -290,57 +290,6 @@ MTLContext_ResetTransform(MTLContext *mtlc)
     mtlc->useTransform = JNI_FALSE;
 }
 
-static void traceMatrix(simd_float4x4 * mtx) {
-    for (int row = 0; row < 4; ++row) {
-        J2dTraceLn4(J2D_TRACE_VERBOSE, "  [%lf %lf %lf %lf]",
-                    mtx->columns[0][row], mtx->columns[1][row], mtx->columns[2][row], mtx->columns[3][row]);
-    }
-}
-
-static void setTransform(MTLContext *mtlc, id<MTLTexture> dest,
-                        jdouble m00, jdouble m10,
-                        jdouble m01, jdouble m11,
-                        jdouble m02, jdouble m12
-) {
-    if (dest == nil) {
-        J2dTraceLn(J2D_TRACE_ERROR, "MTLContext_SetTransformMetal: current dest is null");
-        return;
-    }
-
-    const double dw = dest.width;
-    const double dh = dest.height;
-
-    simd_float4x4 transform;
-    memset(&transform, 0, sizeof(transform));
-    transform.columns[0][0] = m00;
-    transform.columns[0][1] = m10;
-    transform.columns[1][0] = m01;
-    transform.columns[1][1] = m11;
-    transform.columns[3][0] = m02;
-    transform.columns[3][1] = m12;
-    transform.columns[3][3] = 1.0;
-    transform.columns[4][4] = 1.0;
-
-
-    simd_float4x4 normalize;
-    memset(&normalize, 0, sizeof(normalize));
-    normalize.columns[0][0] = 2/dw;
-    normalize.columns[1][1] = -2/dh;
-    normalize.columns[3][0] = -1.f;
-    normalize.columns[3][1] = 1.f;
-    normalize.columns[3][3] = 1.0;
-    normalize.columns[4][4] = 1.0;
-
-    mtlc->transform4x4 = simd_mul(normalize, transform);
-    mtlc->useTransform = JNI_TRUE;
-
-    J2dTraceLn(J2D_TRACE_INFO, "MTLContext_SetTransform");
-//    _traceMatrix(&(transform));
-//    _traceMatrix(&(normalize));
-//    _traceMatrix(&(mtlc->transform4x4));
-
-}
-
 /**
  * Initializes the OpenGL transform state by setting the modelview transform
  * using the given matrix parameters.
@@ -357,13 +306,18 @@ MTLContext_SetTransform(MTLContext *mtlc,
 {
     J2dTracePrimitive("MTLContext_SetTransform");
 
-    const BMTLSDOps * bmtlsdOps = MTLRenderQueue_GetCurrentDestination();
-    if (bmtlsdOps == NULL) {
-        J2dTraceLn(J2D_TRACE_ERROR, "MTLContext_SetTransform: current dest is null");
-        return;
-    }
+    memset(&(mtlc->transform4x4), 0, sizeof(mtlc->transform4x4));
+    mtlc->transform4x4.columns[0][0] = m00;
+    mtlc->transform4x4.columns[0][1] = m10;
+    mtlc->transform4x4.columns[1][0] = m01;
+    mtlc->transform4x4.columns[1][1] = m11;
+    mtlc->transform4x4.columns[3][0] = m02;
+    mtlc->transform4x4.columns[3][1] = m12;
+    mtlc->transform4x4.columns[3][3] = 1.0;
+    mtlc->transform4x4.columns[4][4] = 1.0;
+    mtlc->useTransform = JNI_TRUE;
 
-    setTransform(mtlc, bmtlsdOps->pTexture, m00, m10, m01, m11, m02, m12);
+    J2dTraceLn(J2D_TRACE_INFO, "MTLContext_SetTransform");
 }
 
 /**
@@ -499,6 +453,24 @@ static id<MTLRenderCommandEncoder> createEncoder(MTLContext *mtlc, id<MTLTexture
     return [cb renderCommandEncoderWithDescriptor:rpd];
 }
 
+static void setEncoderTransform(MTLContext *mtlc, id<MTLRenderCommandEncoder> encoder, id<MTLTexture> dest) {
+    simd_float4x4 normalize;
+    memset(&normalize, 0, sizeof(normalize));
+    normalize.columns[0][0] = 2/(double)dest.width;
+    normalize.columns[1][1] = -2/(double)dest.height;
+    normalize.columns[3][0] = -1.f;
+    normalize.columns[3][1] = 1.f;
+    normalize.columns[3][3] = 1.0;
+    normalize.columns[4][4] = 1.0;
+
+    if (mtlc->useTransform) {
+        simd_float4x4 vertexMatrix = simd_mul(normalize, mtlc->transform4x4);
+        [encoder setVertexBytes:&(vertexMatrix) length:sizeof(vertexMatrix) atIndex:MatrixBuffer];
+    } else {
+        [encoder setVertexBytes:&(normalize) length:sizeof(normalize) atIndex:MatrixBuffer];
+    }
+}
+
 id<MTLRenderCommandEncoder> MTLContext_CreateRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest) {
     id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
     if (mtlc->useClip)
@@ -528,29 +500,15 @@ id<MTLRenderCommandEncoder> MTLContext_CreateRenderEncoder(MTLContext *mtlc, id<
 
         [mtlEncoder setFragmentBytes: &uf length:sizeof(uf) atIndex:0];
     }
-    return mtlEncoder;
-}
-
-id<MTLRenderCommandEncoder> createSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
-    id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
-    [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:YES isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
-
-    return mtlEncoder;
-}
-
-id<MTLRenderCommandEncoder> createSamplingTransformEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
-    id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
-
-    [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:NO isSourcePremultiplied:NO compositeRule:mtlc->alphaCompositeRule]];
-    [mtlEncoder setVertexBytes:&(mtlc->transform4x4) length:sizeof(mtlc->transform4x4) atIndex:FrameUniformBuffer];
-
+    setEncoderTransform(mtlc, mtlEncoder, dest);
     return mtlEncoder;
 }
 
 id<MTLRenderCommandEncoder> MTLContext_CreateSamplingEncoder(MTLContext * mtlc, id<MTLTexture> dest) {
-    if (mtlc->useTransform)
-        return createSamplingTransformEncoder(mtlc, dest);
-    return createSamplingEncoder(mtlc, dest);
+    id <MTLRenderCommandEncoder> mtlEncoder = createEncoder(mtlc, dest);
+    [mtlEncoder setRenderPipelineState:[mtlc->mtlPipelineStateStorage getTexturePipelineState:NO compositeRule:mtlc->alphaCompositeRule]];
+    setEncoderTransform(mtlc, mtlEncoder, dest);
+    return mtlEncoder;
 }
 
 id<MTLBlitCommandEncoder> MTLContext_CreateBlitEncoder(MTLContext *mtlc) {

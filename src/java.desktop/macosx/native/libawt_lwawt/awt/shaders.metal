@@ -53,34 +53,26 @@ struct GradShaderInOut {
 };
 
 vertex ColShaderInOut vert_col(VertexInput in [[stage_in]],
-	   constant FrameUniforms& uniforms [[buffer(FrameUniformBuffer)]]) {
+	   constant FrameUniforms& uniforms [[buffer(FrameUniformBuffer)]],
+       constant TransformMatrix& transform [[buffer(MatrixBuffer)]]) {
     ColShaderInOut out;
-    out.position = float4(in.position, 1.0);
+    float4 pos4 = float4(in.position, 1.0);
+    out.position = transform.transformMatrix*pos4;
     out.color = half4(uniforms.color.r, uniforms.color.g, uniforms.color.b, uniforms.color.a);
     return out;
 }
 
-vertex TxtShaderInOut vert_txt(TxtVertexInput in [[stage_in]],
-	   constant FrameUniforms& uniforms [[buffer(FrameUniformBuffer)]]) {
-    TxtShaderInOut out;
-    out.position = float4(in.position, 1.0);
-    out.texCoords = in.texCoords;
-    return out;
-}
-
-vertex GradShaderInOut vert_grad(VertexInput in [[stage_in]]) {
+vertex GradShaderInOut vert_grad(VertexInput in [[stage_in]], constant TransformMatrix& transform [[buffer(MatrixBuffer)]]) {
     GradShaderInOut out;
-    out.position = float4(in.position, 1.0);
+    float4 pos4 = float4(in.position, 1.0);
+    out.position = transform.transformMatrix*pos4;
     return out;
 }
 
-vertex TxtShaderInOut vert_txt_matrix(TxtVertexInput in [[stage_in]],
-       constant FrameUniformsTransform& uniforms [[buffer(FrameUniformBuffer)]]) {
+vertex TxtShaderInOut vert_txt(TxtVertexInput in [[stage_in]], constant TransformMatrix& transform [[buffer(MatrixBuffer)]]) {
     TxtShaderInOut out;
     float4 pos4 = float4(in.position, 1.0);
-    out.position = simd::operator*(uniforms.transformMatrix, pos4);
-    out.position[2] = 0;
-    out.position[3] = 1.f;
+    out.position = transform.transformMatrix*pos4;
     out.texCoords = in.texCoords;
     return out;
 }

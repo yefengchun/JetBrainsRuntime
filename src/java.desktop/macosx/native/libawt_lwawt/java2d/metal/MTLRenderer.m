@@ -29,8 +29,6 @@
 #include <jni_util.h>
 #include <math.h>
 
-//#define DEBUG 1
-
 #include "sun_java2d_metal_MTLRenderer.h"
 
 #include "MTLRenderer.h"
@@ -79,8 +77,8 @@ void MTLRenderer_DrawLine(MTLContext *mtlc, BMTLSDOps * dstOps, jint x1, jint y1
         return;
 
     struct Vertex verts[2] = {
-            {{MTLUtils_normalizeX(dstOps->pTexture, x1), MTLUtils_normalizeY(dstOps->pTexture, y1), 0.0}},
-            {{MTLUtils_normalizeX(dstOps->pTexture, x2), MTLUtils_normalizeY(dstOps->pTexture, y2), 0.0}}
+            {{x1, y1, 0.0}},
+            {{x2, y2, 0.0}}
     };
 
     [mtlEncoder setVertexBytes:verts length:sizeof(verts) atIndex:MeshVertexBuffer];
@@ -104,11 +102,11 @@ void MTLRenderer_DrawRect(MTLContext *mtlc, BMTLSDOps * dstOps, jint x, jint y, 
 
     const int verticesCount = 5;
     struct Vertex vertices[verticesCount] = {
-            {{MTLUtils_normalizeX(dest, x), MTLUtils_normalizeY(dest, y), 0.0}},
-            {{MTLUtils_normalizeX(dest, x + w), MTLUtils_normalizeY(dest, y), 0.0}},
-            {{MTLUtils_normalizeX(dest, x + w), MTLUtils_normalizeY(dest, y + h), 0.0}},
-            {{MTLUtils_normalizeX(dest, x), MTLUtils_normalizeY(dest, y + h), 0.0}},
-            {{MTLUtils_normalizeX(dest, x), MTLUtils_normalizeY(dest, y), 0.0}},
+            {{x, y, 0.0}},
+            {{x + w, y, 0.0}},
+            {{x + w, y + h, 0.0}},
+            {{x, y + h, 0.0}},
+            {{x, y, 0.0}},
     };
     [mtlEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:MeshVertexBuffer];
     [mtlEncoder drawPrimitives:MTLPrimitiveTypeLineStrip vertexStart:0 vertexCount:verticesCount];
@@ -122,9 +120,9 @@ void _tracePoints(jint nPoints, jint *xPoints, jint *yPoints) {
 
 const int POLYLINE_BUF_SIZE = 64;
 
-void _fillVertex(struct Vertex * vertex, int x, int y, int destW, int destH) {
-    vertex->position[0] = 2.0*x/destW - 1.0;
-    vertex->position[1] = 2.0*(1.0 - y/destH) - 1.0;
+void _fillVertex(struct Vertex * vertex, int x, int y) {
+    vertex->position[0] = x;
+    vertex->position[1] = y;
     vertex->position[2] = 0;
 }
 
@@ -157,7 +155,7 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
     const jint firstX = prevX;
     const jint firstY = prevY;
     while (nPoints > 0) {
-        _fillVertex(pointsChunk.verts, prevX + transX, prevY + transY, dstOps->width, dstOps->height);
+        _fillVertex(pointsChunk.verts, prevX + transX, prevY + transY);
 
         const bool isLastChunk = nPoints + 1 <= POLYLINE_BUF_SIZE;
         __block int chunkSize = isLastChunk ? nPoints : POLYLINE_BUF_SIZE - 1;
@@ -165,13 +163,13 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
         for (int i = 1; i < chunkSize; i++) {
             prevX = *(xPoints++);
             prevY = *(yPoints++);
-            _fillVertex(pointsChunk.verts + i, prevX + transX, prevY + transY, dstOps->width, dstOps->height);
+            _fillVertex(pointsChunk.verts + i, prevX + transX, prevY + transY);
         }
 
         bool drawCloseSegment = false;
         if (isClosed && isLastChunk) {
             if (chunkSize + 2 <= POLYLINE_BUF_SIZE) {
-                _fillVertex(pointsChunk.verts + chunkSize, firstX + transX, firstY + transY, dstOps->width, dstOps->height);
+                _fillVertex(pointsChunk.verts + chunkSize, firstX + transX, firstY + transY);
                 ++chunkSize;
             } else
                 drawCloseSegment = true;
@@ -186,8 +184,8 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
         [mtlEncoder drawPrimitives:MTLPrimitiveTypeLineStrip vertexStart:0 vertexCount:chunkSize + 1];
         if (drawCloseSegment) {
             struct Vertex vertices[2] = {
-                    {{MTLUtils_normalizeX(dstOps->pTexture, prevX + transX),     MTLUtils_normalizeY(dstOps->pTexture, prevY + transY), 0.0}},
-                    {{MTLUtils_normalizeX(dstOps->pTexture, firstX + transX),    MTLUtils_normalizeY(dstOps->pTexture, firstY + transY), 0.0}},
+                    {{prevX + transX, prevY + transY, 0.0}},
+                    {{firstX + transX, firstY + transY, 0.0}},
             };
             [mtlEncoder setVertexBytes:vertices length:sizeof(vertices) atIndex:MeshVertexBuffer];
             [mtlEncoder drawPrimitives:MTLPrimitiveTypeLine vertexStart:0 vertexCount:2];
@@ -266,23 +264,12 @@ MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount, jint
             jfloat y2 = spanStruct.spns[i * 4 + 3];
 
             struct Vertex verts[PGRAM_VERTEX_COUNT] = {
-                {{(2.0 * x1 / dest.width) - 1.0,
-                2.0 * (1.0 - y1 / dest.height) - 1.0, 0.0}},
-
-                {{2.0 * (x2) / dest.width - 1.0,
-                2.0 * (1.0 - y1 / dest.height) - 1.0, 0.0}},
-
-                {{2.0 * x1 / dest.width - 1.0,
-                2.0 * (1.0 - y2 / dest.height) - 1.0, 0.0}},
-
-                {{2.0 * x2 / dest.width - 1.0,
-                2.0 * (1.0 - y1 / dest.height) - 1.0, 0.0}},
-
-                {{2.0 * (x2) / dest.width - 1.0,
-                2.0 * (1.0 - y2 / dest.height) - 1.0, 0.0}},
-
-                {{2.0 * (x1) / dest.width - 1.0,
-                2.0 * (1.0 - y2 / dest.height) - 1.0, 0.0},
+                {{x1, y1, 0.0}},
+                {{x2, y1, 0.0}},
+                {{x1, y2, 0.0}},
+                {{x2, y1, 0.0}},
+                {{x2, y2, 0.0}},
+                {{x1, y2, 0.0},
             }};
 
             [mtlEncoder setVertexBytes:verts length:sizeof(verts) atIndex:MeshVertexBuffer];
@@ -317,23 +304,12 @@ MTLRenderer_FillParallelogram(MTLContext *mtlc, BMTLSDOps * dstOps,
                 dx12, dy12, dest);
 
     struct Vertex verts[PGRAM_VERTEX_COUNT] = {
-            { {(2.0*fx11/dest.width) - 1.0,
-                      2.0*(1.0 - fy11/dest.height) - 1.0, 0.0}},
-
-            { {2.0*(fx11+dx21)/dest.width - 1.0,
-                      2.0*(1.0 - (fy11+dy21)/dest.height) - 1.0, 0.0}},
-
-            { {2.0*(fx11+dx12)/dest.width - 1.0,
-                      2.0*(1.0 - (fy11+dy12)/dest.height) - 1.0, 0.0}},
-
-            { {2.0*(fx11+dx21)/dest.width - 1.0,
-                      2.0*(1.0 - (fy11+dy21)/dest.height) - 1.0, 0.0}},
-
-            { {2.0*(fx11 + dx21 + dx12)/dest.width - 1.0,
-                      2.0*(1.0 - (fy11+ dy21 + dy12)/dest.height) - 1.0, 0.0}},
-
-            { {2.0*(fx11+dx12)/dest.width - 1.0,
-                      2.0*(1.0 - (fy11+dy12)/dest.height) - 1.0, 0.0},
+            { {fx11, fy11, 0.0}},
+            { {fx11+dx21, fy11+dy21, 0.0}},
+            { {fx11+dx12, fy11+dy12, 0.0}},
+            { {fx11+dx21, fy11+dy21, 0.0}},
+            { {fx11 + dx21 + dx12, fy11+ dy21 + dy12, 0.0}},
+            { {fx11+dx12, fy11+dy12, 0.0},
             }};
 
     // Encode render command.

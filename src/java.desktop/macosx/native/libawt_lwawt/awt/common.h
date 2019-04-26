@@ -38,13 +38,14 @@ enum VertexAttributes {
 enum BufferIndex  {
     MeshVertexBuffer = 0,
     FrameUniformBuffer = 1,
+    MatrixBuffer = 2
 };
 
 struct FrameUniforms {
     vector_float4 color;
 };
 
-struct FrameUniformsTransform {
+struct TransformMatrix {
     matrix_float4x4 transformMatrix;
 };
 
