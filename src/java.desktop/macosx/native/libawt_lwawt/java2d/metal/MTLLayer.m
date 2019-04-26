@@ -70,7 +70,7 @@
 }
 
 - (void) blitTexture:(id<MTLCommandBuffer>)commandBuf {
-    if (self.ctx == NULL || self.javaLayer == NULL || self.buffer == nil || ctx->mtlDevice == nil) {
+    if (self.ctx == NULL || self.javaLayer == NULL || self.buffer == nil || ctx.device == nil) {
         J2dTraceLn4(J2D_TRACE_VERBOSE, "MTLLayer.blitTexture: uninitialized (mtlc=%p, javaLayer=%p, buffer=%p, devide=%p)", self.ctx, self.javaLayer, self.buffer, ctx->mtlDevice);
         return;
     }
@@ -81,7 +81,7 @@
     }
 
     @autoreleasepool {
-        self.device = ctx->mtlDevice;
+        self.device = ctx.device;
         self.pixelFormat = MTLPixelFormatBGRA8Unorm;
         self.framebufferOnly = NO;
 
@@ -104,7 +104,7 @@
 
         [commandBuf addCompletedHandler:^(id <MTLCommandBuffer> cmdBuff) {
                 [cmdBuff release];
-                [ctx->mtlTexturePool markAllTexturesFree];
+                [ctx.texturePool markAllTexturesFree];
         }];
 
         [commandBuf commit];
@@ -157,7 +157,7 @@ Java_sun_java2d_metal_MTLLayer_validate
         layer.bufferHeight = bmtlsdo->width;
         layer.buffer = bmtlsdo->pTexture;
         layer.ctx = ((MTLSDOps *)bmtlsdo->privOps)->configInfo->context;
-        layer.device = layer.ctx->mtlDevice;
+        layer.device = layer.ctx.device;
     } else {
         layer.ctx = NULL;
     }

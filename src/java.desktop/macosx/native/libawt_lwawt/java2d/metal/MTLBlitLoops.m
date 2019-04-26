@@ -124,8 +124,10 @@ static void drawTex2Tex(MTLContext *mtlc,
 //    J2dTraceLn4(J2D_TRACE_VERBOSE, "  sx1=%d sy1=%d sx2=%d sy2=%d", sx1, sy1, sx2, sy2);
 //    J2dTraceLn4(J2D_TRACE_VERBOSE, "  dx1=%f dy1=%f dx2=%f dy2=%f", dx1, dy1, dx2, dy2);
 
-    id<MTLRenderCommandEncoder> encoder = MTLContext_CreateSamplingEncoder(mtlc, dst);
+    id<MTLRenderCommandEncoder> encoder = [mtlc createSamplingEncoderForDest:dst];
 
+
+    const jboolean normalize = !mtlc.useTransform;
     struct TxtVertex quadTxVerticesBuffer[6];
     fillTxQuad(quadTxVerticesBuffer, sx1, sy1, sx2, sy2, src.width, src.height, dx1, dy1, dx2, dy2, dst.width, dst.height);
 
@@ -193,7 +195,7 @@ MTLBlitSwToSurfaceViaTexture(MTLContext *ctx, SurfaceDataRasInfo *srcInfo, BMTLS
     J2dTraceImpl(J2D_TRACE_VERBOSE, JNI_TRUE, "MTLBlitLoops_Blit [via pooled texture]: bdst=%p [tex=%p], sw=%d, sh=%d | src (%d, %d, %d, %d) -> dst (%1.2f, %1.2f, %1.2f, %1.2f)", bmtlsdOps, dest, sw, sh, sx1, sy1, sx2, sy2, dx1, dy1, dx2, dy2);
 #endif //DEBUG
 
-    id<MTLTexture> texBuff = [ctx->mtlTexturePool getTexture:sw height:sh format:MTLPixelFormatBGRA8Unorm];
+    id<MTLTexture> texBuff = [ctx.texturePool getTexture:sw height:sh format:MTLPixelFormatBGRA8Unorm];
     if (texBuff == nil) {
         J2dTraceLn(J2D_TRACE_ERROR, "MTLBlitSwToSurfaceViaTexture: can't obtain temporary texture object from pool");
         return;
@@ -332,14 +334,14 @@ MTLBlitLoops_IsoBlit(JNIEnv *env,
     }
 
     const jboolean useBlitEncoder =
-            MTLContext_IsBlendingDisabled(mtlc)
+            mtlc.isBlendingDisabled
             && fabs(dx2 - dx1 - sx2 + sx1) < 0.001f && fabs(dy2 - dy1 - sy2 + sy1) < 0.001f // dimensions are equal (TODO: check that dx1,dy1 is integer)
-            && !mtlc->useTransform; // TODO: check whether transform is simple translate (and use blitEncoder in this case)
+            && !mtlc.useTransform; // TODO: check whether transform is simple translate (and use blitEncoder in this case)
     if (useBlitEncoder) {
 #ifdef DEBUG
         J2dTraceImpl(J2D_TRACE_VERBOSE, JNI_TRUE, "MTLBlitLoops_IsoBlit [via blitEncoder]: bdst=%p [tex=%p] %dx%d | src (%d, %d, %d, %d) -> dst (%1.2f, %1.2f, %1.2f, %1.2f)", dstOps, dstTex, dstTex.width, dstTex.height, sx1, sy1, sx2, sy2, dx1, dy1, dx2, dy2);
 #endif //DEBUG
-        id <MTLBlitCommandEncoder> blitEncoder = MTLContext_CreateBlitEncoder(mtlc);
+        id <MTLBlitCommandEncoder> blitEncoder = [mtlc createBlitEncoder];
         [blitEncoder copyFromTexture:srcTex sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(sx1, sy1, 0) sourceSize:MTLSizeMake(sx2 - sx1, sy2 - sy1, 1) toTexture:dstTex destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(dx1, dy1, 0)];
         [blitEncoder endEncoding];
     } else {
@@ -435,9 +437,9 @@ MTLBlitLoops_Blit(JNIEnv *env,
 
             // NOTE: if (texture) => dest coordinates will always be integers since we only ever do a straight copy from sw to texture.
             const jboolean useReplaceRegion = texture ||
-                    (MTLContext_IsBlendingDisabled(mtlc)
+                    mtlc.isBlendingDisabled
                     && fabs(dx2 - dx1 - sx2 + sx1) < 0.001f && fabs(dy2 - dy1 - sy2 + sy1) < 0.001f // dimensions are equal (TODO: check that dx1,dy1 is integer)
-                    && !mtlc->useTransform); // TODO: check whether transform is simple translate (and use replaceRegion in this case)
+                    && !mtlc.useTransform; // TODO: check whether transform is simple translate (and use replaceRegion in this case)
             if (useReplaceRegion) {
                 MTLRegion region = MTLRegionMake2D(dx1, dy1, dx2 - dx1, dy2 - dy1);
 #ifdef DEBUG

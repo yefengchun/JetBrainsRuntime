@@ -35,10 +35,6 @@ void MTLPaints_ResetPaint(MTLContext *mtlc);
 
 void MTLPaints_SetColor(MTLContext *mtlc, jint pixel);
 
-void MTLPaints_SetGradientPaint(MTLContext *mtlc,
-                                jboolean useMask, jboolean cyclic,
-                                jdouble p0, jdouble p1, jdouble p3,
-                                jint pixel1, jint pixel2);
 
 void MTLPaints_SetLinearGradientPaint(MTLContext *mtlc, BMTLSDOps *dstOps,
                                       jboolean useMask, jboolean linear,

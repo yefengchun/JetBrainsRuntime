@@ -37,6 +37,51 @@
 #include "MTLUtils.h"
 #import "MTLLayer.h"
 
+void MTLRenderer_FillParallelogramMetal(
+    MTLContext* mtlc, id<MTLTexture> dest, jfloat x, jfloat y, jfloat dx1, jfloat dy1, jfloat dx2, jfloat dy2)
+{
+    if (mtlc == NULL || dest == nil)
+        return;
+
+    J2dTraceLn7(J2D_TRACE_INFO,
+                "MTLRenderer_FillParallelogramMetal "
+                "(x=%6.2f y=%6.2f "
+                "dx1=%6.2f dy1=%6.2f "
+                "dx2=%6.2f dy2=%6.2f dst tex=%p)",
+                x, y,
+                dx1, dy1,
+                dx2, dy2, dest);
+
+    struct Vertex verts[PGRAM_VERTEX_COUNT] = {
+    { {(2.0*x/dest.width) - 1.0,
+       2.0*(1.0 - y/dest.height) - 1.0, 0.0}},
+
+    { {2.0*(x+dx1)/dest.width - 1.0,
+      2.0*(1.0 - (y+dy1)/dest.height) - 1.0, 0.0}},
+
+    { {2.0*(x+dx2)/dest.width - 1.0,
+      2.0*(1.0 - (y+dy2)/dest.height) - 1.0, 0.0}},
+
+    { {2.0*(x+dx1)/dest.width - 1.0,
+      2.0*(1.0 - (y+dy1)/dest.height) - 1.0, 0.0}},
+
+    { {2.0*(x + dx1 + dx2)/dest.width - 1.0,
+      2.0*(1.0 - (y+ dy1 + dy2)/dest.height) - 1.0, 0.0}},
+
+    { {2.0*(x+dx2)/dest.width - 1.0,
+      2.0*(1.0 - (y+dy2)/dest.height) - 1.0, 0.0},
+    }};
+
+    // Encode render command.
+    id<MTLRenderCommandEncoder> mtlEncoder = [mtlc createRenderEncoderForDest:dest];
+    if (mtlEncoder == nil)
+        return;
+
+    [mtlEncoder setVertexBytes:verts length:sizeof(verts) atIndex:MeshVertexBuffer];
+    [mtlEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount: PGRAM_VERTEX_COUNT];
+    [mtlEncoder endEncoding];
+}
+
 /**
  * Note: Some of the methods in this file apply a "magic number"
  * translation to line segments.  The OpenGL specification lays out the
@@ -72,7 +117,7 @@ void MTLRenderer_DrawLine(MTLContext *mtlc, BMTLSDOps * dstOps, jint x1, jint y1
 
     J2dTraceLn5(J2D_TRACE_INFO, "MTLRenderer_DrawLine (x1=%1.2f y1=%1.2f x2=%1.2f y2=%1.2f), dst tex=%p", x1, y1, x2, y2, dstOps->pTexture);
 
-    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dstOps->pTexture);
+    id<MTLRenderCommandEncoder> mtlEncoder = [mtlc createRenderEncoderForDest:dstOps->pTexture];
     if (mtlEncoder == nil)
         return;
 
@@ -96,7 +141,7 @@ void MTLRenderer_DrawRect(MTLContext *mtlc, BMTLSDOps * dstOps, jint x, jint y, 
     J2dTraceLn5(J2D_TRACE_INFO, "MTLRenderer_DrawRect (x=%d y=%d w=%d h=%d), dst tex=%p", x, y, w, h, dest);
 
     // TODO: use DrawParallelogram(x, y, w, h, lw=1, lh=1)
-    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
+    id<MTLRenderCommandEncoder> mtlEncoder = [mtlc createRenderEncoderForDest:dest];
     if (mtlEncoder == nil)
         return;
 
@@ -171,7 +216,7 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
         }
 
         nPoints -= chunkSize;
-        id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dstOps->pTexture);
+        id<MTLRenderCommandEncoder> mtlEncoder = [mtlc createRenderEncoderForDest:dstOps->pTexture];
         if (mtlEncoder == nil)
             return;
 
@@ -248,7 +293,7 @@ MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount, jint
         spanCount -= sc;
 
         id<MTLTexture> dest = dstOps->pTexture;
-        id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
+        id<MTLRenderCommandEncoder> mtlEncoder = [mtlc createRenderEncoderForDest:dest];
         if (mtlEncoder == nil)
             return;
 
@@ -272,6 +317,7 @@ MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount, jint
         }
 
         [mtlEncoder endEncoding];
+        [mtlEncoder release];
     }
 }
 
@@ -308,7 +354,7 @@ MTLRenderer_FillParallelogram(MTLContext *mtlc, BMTLSDOps * dstOps,
             }};
 
     // Encode render command.
-    id<MTLRenderCommandEncoder> mtlEncoder = MTLContext_CreateRenderEncoder(mtlc, dest);
+    id<MTLRenderCommandEncoder> mtlEncoder = [mtlc createRenderEncoderForDest:dest];
     if (mtlEncoder == nil)
         return;
 

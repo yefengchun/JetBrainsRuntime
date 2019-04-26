@@ -119,7 +119,7 @@ Java_sun_java2d_metal_MTLSurfaceData_initTexture
     MTLContext* ctx = mtlsdo->configInfo->context;
 
     MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat: MTLPixelFormatBGRA8Unorm width: width height: height mipmapped: NO];
-    bmtlsdo->pTexture = [[ctx->mtlDevice newTextureWithDescriptor: textureDescriptor] retain];
+    bmtlsdo->pTexture = [[ctx.device newTextureWithDescriptor: textureDescriptor] retain];
     bmtlsdo->isOpaque = isOpaque;
     bmtlsdo->xOffset = 0;
     bmtlsdo->yOffset = 0;
@@ -172,7 +172,7 @@ Java_sun_java2d_metal_MTLSurfaceData_initRTexture
 
     const MTLContext* ctx = mtlsdo->configInfo->context;
     MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat: MTLPixelFormatBGRA8Unorm width: width height: height mipmapped: NO];
-    bmtlsdo->pTexture = [[ctx->mtlDevice newTextureWithDescriptor: textureDescriptor] retain];;
+    bmtlsdo->pTexture = [[ctx.device newTextureWithDescriptor: textureDescriptor] retain];;
 
     bmtlsdo->isOpaque = isOpaque;
     bmtlsdo->xOffset = 0;
@@ -447,7 +447,7 @@ Java_sun_java2d_metal_MTLSurfaceData_validate
 
     if (mtlsdo->drawableType == MTLSD_WINDOW) {
         // J2dTraceLn4(J2D_TRACE_INFO, "MTLContext_SetSurfaces: w=%d h=%d src=%p dst=%p", width, height, mtlsdo, mtlsdo);
-        MTLContext_SetSurfaces(env, ptr_to_jlong(mtlsdo), ptr_to_jlong(mtlsdo));
+        [MTLContext setSurfacesEnv:env src:ptr_to_jlong(mtlsdo) dst:ptr_to_jlong(mtlsdo)];
 
         // we have to explicitly tell the NSOpenGLContext that its target
         // drawable has changed size

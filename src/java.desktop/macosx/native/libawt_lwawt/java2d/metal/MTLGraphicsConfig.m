@@ -56,8 +56,8 @@ MTLGC_DestroyMTLGraphicsConfig(jlong pConfigInfo)
 
     MTLContext *mtlc = (MTLContext*)mtlinfo->context;
     if (mtlc != NULL) {
-        MTLContext_DestroyContextResources(mtlc);
-        mtlinfo->context = NULL;
+        [mtlinfo->context release];
+        mtlinfo->context = nil;
     }
     free(mtlinfo);
 }
@@ -122,14 +122,6 @@ Java_sun_java2d_metal_MTLGraphicsConfig_getMTLConfigInfo
 }
 
 
-static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
-    {{-1.0, 1.0, 0.0}, {0.0, 0.0}},
-    {{1.0, 1.0, 0.0}, {1.0, 0.0}},
-    {{1.0, -1.0, 0.0}, {1.0, 1.0}},
-    {{1.0, -1.0, 0.0}, {1.0, 1.0}},
-    {{-1.0, -1.0, 0.0}, {0.0, 1.0}},
-    {{-1.0, 1.0, 0.0}, {0.0, 0.0}}
-};
 
 
 @implementation MTLGraphicsConfigUtil
@@ -169,27 +161,14 @@ static struct TxtVertex verts[PGRAM_VERTEX_COUNT] = {
     }
     [window setContentView: scratchSurface];
 
-    MTLContext *mtlc = (MTLContext *)malloc(sizeof(MTLContext));
+    MTLContext *mtlc = [[MTLContext alloc] initWithDevice:CGDirectDisplayCopyCurrentMetalDevice(displayID)
+                        shadersLib:mtlShadersLib];
     if (mtlc == 0L) {
         J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLGC_InitMTLContext: could not allocate memory for mtlc");
         [argValue addObject: [NSNumber numberWithLong: 0L]];
         return;
     }
-    memset(mtlc, 0, sizeof(MTLContext));
 
-
-    mtlc->mtlDevice = [CGDirectDisplayCopyCurrentMetalDevice(displayID) retain];
-    mtlc->mtlTexturePool = [[MTLTexturePool alloc] initWithDevice:mtlc->mtlDevice];
-
-    mtlc->mtlVertexBuffer = [mtlc->mtlDevice newBufferWithBytes:verts
-                                                           length:sizeof(verts)
-                                                           options:MTLResourceCPUCacheModeDefaultCache];
-    mtlc->mtlPipelineStateStorage = [[MTLPipelineStatesStorage alloc] initWithDevice:mtlc->mtlDevice shaderLibPath:mtlShadersLib];
-
-    mtlc->mtlCommandBuffer = nil;
-
-    // Create command queue
-    mtlc->mtlCommandQueue = [mtlc->mtlDevice newCommandQueue];
 
     // create the MTLGraphicsConfigInfo record for this config
     MTLGraphicsConfigInfo *mtlinfo = (MTLGraphicsConfigInfo *)malloc(sizeof(MTLGraphicsConfigInfo));

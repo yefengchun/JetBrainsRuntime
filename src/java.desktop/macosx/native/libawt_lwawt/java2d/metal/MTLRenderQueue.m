@@ -92,12 +92,12 @@ static void scheduleBlitAllModifiedLayers() {
         MTLContext * ctx = layer.ctx;
         if (layer == NULL || ctx == NULL)
             continue;
-        id<MTLCommandBuffer> bufferToCommit = ctx->mtlCommandBuffer;
+        id<MTLCommandBuffer> bufferToCommit = ctx.commandBuffer;
         [JNFRunLoop performOnMainThreadWaiting:NO withBlock:^(){
             [layer blitTexture:bufferToCommit];
         }];
 
-        ctx->mtlCommandBuffer = nil;
+        [ctx releaseCommandBuffer];
     }
     g_modifiedLayersCount = 0;
 }
@@ -448,12 +448,12 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint y1 = NEXT_INT(b);
                 jint x2 = NEXT_INT(b);
                 jint y2 = NEXT_INT(b);
-                MTLContext_SetRectClip(mtlc, x1, y1, x2, y2);
+                [mtlc setClipRectX1:x1 Y1:y1 X2:x2 Y2:y2];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_BEGIN_SHAPE_CLIP:
             {
-                MTLContext_BeginShapeClip(mtlc);
+                [mtlc beginShapeClip];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_SHAPE_CLIP_SPANS:
@@ -465,12 +465,13 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
             break;
         case sun_java2d_pipe_BufferedOpCodes_END_SHAPE_CLIP:
             {
-                MTLContext_EndShapeClip(mtlc, dstOps);
+                //TODO
+                [mtlc endShapeClipDstOps:dstOps];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_RESET_CLIP:
             {
-                MTLContext_ResetClip(mtlc);
+                [mtlc resetClip];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_ALPHA_COMPOSITE:
@@ -478,18 +479,18 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint rule         = NEXT_INT(b);
                 jfloat extraAlpha = NEXT_FLOAT(b);
                 jint flags        = NEXT_INT(b);
-                MTLContext_SetAlphaComposite(mtlc, rule, extraAlpha, flags);
+                [mtlc setAlphaCompositeRule:rule extraAlpha:extraAlpha flags:flags];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_XOR_COMPOSITE:
             {
                 jint xorPixel = NEXT_INT(b);
-                MTLContext_SetXorComposite(mtlc, xorPixel);
+                [mtlc setXorComposite:xorPixel];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_RESET_COMPOSITE:
             {
-                MTLContext_ResetComposite(mtlc);
+                [mtlc resetComposite];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_TRANSFORM:
@@ -500,12 +501,12 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jdouble m11 = NEXT_DOUBLE(b);
                 jdouble m02 = NEXT_DOUBLE(b);
                 jdouble m12 = NEXT_DOUBLE(b);
-                MTLContext_SetTransform(mtlc, m00, m10, m01, m11, m02, m12);
+                [mtlc setTransformM00:m00 M10:m10 M01:m01 M11:m11 M02:m02 M12:m12];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_RESET_TRANSFORM:
             {
-                MTLContext_ResetTransform(mtlc);
+                [mtlc resetTransform];
             }
             break;
 
@@ -521,7 +522,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 }
 
                 dstOps = (BMTLSDOps *)jlong_to_ptr(pDst);
-                mtlc = MTLContext_SetSurfaces(env, pSrc, pDst);
+                [MTLContext setSurfacesEnv:env src:pSrc dst:pDst];
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_SCRATCH_SURFACE:
@@ -655,11 +656,9 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
 
                 if (dstOps != NULL) {
                     MTLSDOps *dstCGLOps = (MTLSDOps *)dstOps->privOps;
-                    [JNFRunLoop performOnMainThreadWaiting:NO withBlock:^(){
-                        MTLPaints_SetColor(mtlc, pixel);
-                        dstCGLOps->configInfo->context->mtlColor = pixel;
-                    }];
+                    dstCGLOps->configInfo->context.color = pixel;
                 }
+                MTLPaints_SetColor(mtlc, pixel);
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SET_GRADIENT_PAINT:
@@ -674,13 +673,10 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                 jint pixel2     = NEXT_INT(b);
                 if (dstOps != NULL) {
                     MTLSDOps *dstCGLOps = (MTLSDOps *)dstOps->privOps;
-                    [JNFRunLoop performOnMainThreadWaiting:NO withBlock:^(){
-                        MTLPaints_SetGradientPaint(
-                                dstCGLOps->configInfo->context,
-                                useMask, cyclic,
-                                p0, p1, p3,
-                                pixel1, pixel2);
-                    }];
+                    [dstCGLOps->configInfo->context setGradientPaintUseMask:useMask cyclic:cyclic
+                                                                         p0:p0 p1:p1 p3:p3
+                                                                     pixel1:pixel1 pixel2:pixel2];
+
                 }
             }
             break;

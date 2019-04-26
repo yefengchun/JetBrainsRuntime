@@ -120,8 +120,8 @@ MTLVertexCache_RestoreColorState(MTLContext *mtlc)
 {
     // TODO
     J2dTraceNotImplPrimitive("MTLVertexCache_RestoreColorState");
-    if (mtlc->paintState == sun_java2d_SunGraphics2D_PAINT_ALPHACOLOR) {
-        MTLPaints_SetColor(mtlc, mtlc->pixel);
+    if (mtlc.paintState == sun_java2d_SunGraphics2D_PAINT_ALPHACOLOR) {
+        [mtlc setColor:mtlc.pixel];
     }
 }
 

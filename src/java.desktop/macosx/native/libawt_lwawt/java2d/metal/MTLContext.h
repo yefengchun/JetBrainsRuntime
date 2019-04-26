@@ -57,59 +57,175 @@ typedef struct {
 } MTLBlendRule;
 
 /**
- * The MTLContext structure contains cached state relevant to the native
- * OpenGL context stored within the native ctxInfo field.  Each Java-level
- * MTLContext object is associated with a native-level MTLContext structure.
- * The caps field is a bitfield that expresses the capabilities of the
- * GraphicsConfig associated with this context (see MTLContext.java for
- * the definitions of each capability bit).  The other fields are
- * simply cached values of various elements of the context state, typically
- * used in the MTLContext.set*() methods.
- *
- * Note that the textureFunction field is implicitly set to zero when the
- * MTLContext is created.  The acceptable values (e.g. GL_MODULATE,
- * GL_REPLACE) for this field are never zero, which means we will always
- * validate the texture function state upon the first call to the
- * MTLC_UPDATE_TEXTURE_FUNCTION() macro.
+ * The MTLContext class contains cached state relevant to the native
+ * MTL context stored within the native ctxInfo field.  Each Java-level
+ * MTLContext object is associated with a native-level MTLContext class.
+ * */
+@interface MTLContext : NSObject
+
+@property jint          compState;
+@property jfloat        extraAlpha;
+@property jint          alphaCompositeRule;
+@property jint          xorPixel;
+@property jint          pixel;
+
+@property jdouble       p0;
+@property jdouble       p1;
+@property jdouble       p3;
+@property jboolean      cyclic;
+@property jint          pixel1;
+@property jint          pixel2;
+
+@property jubyte        r;
+@property jubyte        g;
+@property jubyte        b;
+@property jubyte        a;
+@property jint          paintState;
+@property jboolean      useMask;
+@property jboolean      useTransform;
+@property simd_float4x4 transform4x4;
+@property jint          blitTextureID;
+@property jint          textureFunction;
+@property jboolean      vertexCacheEnabled;
+
+@property (readonly, strong)   id<MTLDevice>   device;
+@property (strong) id<MTLLibrary>              library;
+@property (strong) id<MTLRenderPipelineState>  pipelineState;
+@property (strong) id<MTLCommandQueue>         commandQueue;
+@property (readonly,strong) id<MTLCommandBuffer>        commandBuffer;
+@property (strong) id<MTLBuffer>               vertexBuffer;
+@property jint                        color;
+@property MTLScissorRect              clipRect;
+@property jboolean                    useClip;
+@property (strong)MTLPipelineStatesStorage*   pipelineStateStorage;
+@property (strong)MTLTexturePool*             texturePool;
+
+- (void)releaseCommandBuffer;
+/**
+ * Fetches the MTLContext associated with the given destination surface,
+ * makes the context current for those surfaces, updates the destination
+ * viewport, and then returns a pointer to the MTLContext.
  */
-typedef struct {
-    jint       compState;
-    jfloat     extraAlpha;
-    jint       alphaCompositeRule;
-    jint       xorPixel;
-    jint       pixel;
++ (MTLContext*) setSurfacesEnv:(JNIEnv*)env src:(jlong)pSrc dst:(jlong)pDst;
 
-    jdouble    p0;
-    jdouble    p1;
-    jdouble    p3;
-    jboolean   cyclic;
-    jint       pixel1;
-    jint       pixel2;
+- (id)initWithDevice:(id<MTLDevice>)d shadersLib:(NSString*)shadersLib;
+
+/**
+ * Resets the current clip state (disables both scissor and depth tests).
+ */
+- (void)resetClip;
+
+/**
+ * Sets the Metal scissor bounds to the provided rectangular clip bounds.
+ */
+- (void)setClipRectX1:(jint)x1 Y1:(jint)y1 X2:(jint)x2 Y2:(jint)y2;
+
+/**
+ * Sets up a complex (shape) clip using the OpenGL depth buffer.  This
+ * method prepares the depth buffer so that the clip Region spans can
+ * be "rendered" into it.  The depth buffer is first cleared, then the
+ * depth func is setup so that when we render the clip spans,
+ * nothing is rendered into the color buffer, but for each pixel that would
+ * be rendered, a non-zero value is placed into that location in the depth
+ * buffer.  With depth test enabled, pixels will only be rendered into the
+ * color buffer if the corresponding value at that (x,y) location in the
+ * depth buffer differs from the incoming depth value.
+ */
+- (void)beginShapeClip;
+
+/**
+ * Finishes setting up the shape clip by resetting the depth func
+ * so that future rendering operations will once again be written into the
+ * color buffer (while respecting the clip set up in the depth buffer).
+ */
+- (void)endShapeClip;
+
+/**
+ * Initializes the OpenGL state responsible for applying extra alpha.  This
+ * step is only necessary for any operation that uses glDrawPixels() or
+ * glCopyPixels() with a non-1.0f extra alpha value.  Since the source is
+ * always premultiplied, we apply the extra alpha value to both alpha and
+ * color components using GL_*_SCALE.
+ */
+- (void)setExtraAlpha:(jfloat)ea;
+
+/**
+ * Resets all OpenGL compositing state (disables blending and logic
+ * operations).
+ */
+- (void)resetComposite;
+
+/**
+ * Initializes the OpenGL blending state.  XOR mode is disabled and the
+ * appropriate blend functions are setup based on the AlphaComposite rule
+ * constant.
+ */
+- (void)setAlphaCompositeRule:(jint)rule extraAlpha:(jfloat)extraAlpha
+                        flags:(jint)flags;
+
+/**
+ * Initializes the OpenGL logic op state to XOR mode.  Blending is disabled
+ * before enabling logic op mode.  The XOR pixel value will be applied
+ * later in the MTLContext_SetColor() method.
+ */
+- (void)setXorComposite:(jint)xorPixel;
+- (jboolean)isBlendingDisabled;
+
+/**
+ * Resets the OpenGL transform state back to the identity matrix.
+ */
+- (void)resetTransform;
+
+/**
+ * Initializes the OpenGL transform state by setting the modelview transform
+ * using the given matrix parameters.
+ *
+ * REMIND: it may be worthwhile to add serial id to AffineTransform, so we
+ *         could do a quick check to see if the xform has changed since
+ *         last time... a simple object compare won't suffice...
+ */
+- (void)setTransformM00:(jdouble) m00 M10:(jdouble) m10
+                    M01:(jdouble) m01 M11:(jdouble) m11
+                    M02:(jdouble) m02 M12:(jdouble) m12;
+
+/**
+ * Initializes a small texture tile for use with tiled blit operations (see
+ * MTLBlitLoops.c and MTLMaskBlit.c for usage examples).  The texture ID for
+ * the tile is stored in the given MTLContext.  The tile is initially filled
+ * with garbage values, but the tile is updated as needed (via
+ * glTexSubImage2D()) with real RGBA values used in tiled blit situations.
+ * The internal format for the texture is GL_RGBA8, which should be sufficient
+ * for storing system memory surfaces of any known format (see PixelFormats
+ * for a list of compatible surface formats).
+ */
+- (jboolean)initBlitTileTexture;
 
 
-    jubyte     r;
-    jubyte     g;
-    jubyte     b;
-    jubyte     a;
-    jint       paintState;
-    jboolean   useMask;
-    jboolean   useTransform;
-    simd_float4x4 transform4x4;
-    jint     blitTextureID;
-    jint      textureFunction;
-    jboolean   vertexCacheEnabled;
+/**
+ * Creates a 2D texture of the given format and dimensions and returns the
+ * texture object identifier.  This method is typically used to create a
+ * temporary texture for intermediate work, such as in the
+ * MTLContext_InitBlitTileTexture() method below.
+ */
+- (jint)createBlitTextureFormat:(jint)internalFormat pixelFormat:(jint)pixelFormat
+                          width:(jint)width height:(jint)height;
 
-    id<MTLDevice>               mtlDevice;
-    id<MTLCommandQueue>         mtlCommandQueue;
-    id<MTLCommandBuffer>        mtlCommandBuffer;
-    id<MTLBuffer>               mtlVertexBuffer;
-    jint                        mtlColor;
-    MTLScissorRect              mtlClipRect;
-    jboolean                    useClip;
+- (void)destroyContextResources;
 
-    MTLPipelineStatesStorage *  mtlPipelineStateStorage;
-    MTLTexturePool*             mtlTexturePool;
-} MTLContext;
+- (void)setColorR:(int)r G:(int)g B:(int)b A:(int)a;
+- (void)setColorInt:(int)pixel;
+
+- (id<MTLRenderCommandEncoder>)createSamplingEncoderForDest:(id<MTLTexture>)dest clearRed:(int)clearRed;
+- (id<MTLRenderCommandEncoder>)createSamplingEncoderForDest:(id<MTLTexture>)dest;
+- (id<MTLBlitCommandEncoder>)createBlitEncoder;
+// NOTE: debug parameners will be removed soon
+- (id<MTLRenderCommandEncoder>)createRenderEncoderForDest:(id<MTLTexture>)dest clearRed:(int) clearRed/*debug param*/;
+- (id<MTLRenderCommandEncoder>)createRenderEncoderForDest:(id<MTLTexture>)dest;
+- (void)setGradientPaintUseMask:(jboolean)useMask cyclic:(jboolean)cyclic p0:(jdouble) p0 p1:(jdouble) p1 p3:(jdouble)p3
+                         pixel1:(jint)pixel1 pixel2:(jint) pixel2;
+- (void) setEncoderTransform:(id<MTLRenderCommandEncoder>) encoder dest:(id<MTLTexture>) dest;
+- (void)dealloc;
+@end
 
 /**
  * See BufferedContext.java for more on these flags...
@@ -120,43 +236,5 @@ typedef struct {
     sun_java2d_pipe_BufferedContext_SRC_IS_OPAQUE
 #define MTLC_USE_MASK         \
     sun_java2d_pipe_BufferedContext_USE_MASK
-
-/**
- * See MTLContext.java for more on these flags.
- */
-
-/**
- * Exported methods.
- */
-MTLContext *MTLContext_SetSurfaces(JNIEnv *env, jlong pSrc, jlong pDst);
-void MTLContext_ResetClip(MTLContext *mtlc);
-void MTLContext_SetRectClip(MTLContext *mtlc,
-                            jint x1, jint y1, jint x2, jint y2);
-void MTLContext_BeginShapeClip(MTLContext *mtlc);
-void MTLContext_EndShapeClip(MTLContext *mtlc, BMTLSDOps *dstOps);
-void MTLContext_SetExtraAlpha(jfloat ea);
-void MTLContext_ResetComposite(MTLContext *mtlc);
-void MTLContext_SetAlphaComposite(MTLContext *mtlc,
-                                  jint rule, jfloat extraAlpha, jint flags);
-void MTLContext_SetXorComposite(MTLContext *mtlc, jint xorPixel);
-jboolean MTLContext_IsBlendingDisabled(MTLContext *mtlc);
-void MTLContext_ResetTransform(MTLContext *mtlc);
-void MTLContext_SetTransform(MTLContext *mtlc,
-                             jdouble m00, jdouble m10,
-                             jdouble m01, jdouble m11,
-                             jdouble m02, jdouble m12);
-
-jboolean MTLContext_InitBlitTileTexture(MTLContext *mtlc);
-jint MTLContext_CreateBlitTexture(jint internalFormat, jint pixelFormat,
-                                    jint width, jint height);
-
-void MTLContext_DestroyContextResources(MTLContext *mtlc);
-
-void MTLContext_SetColor(MTLContext *ctx, int r, int g, int b, int a);
-void MTLContext_SetColorInt(MTLContext *ctx, int pixel);
-
-id<MTLRenderCommandEncoder> MTLContext_CreateRenderEncoder(MTLContext *mtlc, id<MTLTexture> dest);
-id<MTLRenderCommandEncoder> MTLContext_CreateSamplingEncoder(MTLContext *mtlc, id<MTLTexture> dest);
-id<MTLBlitCommandEncoder> MTLContext_CreateBlitEncoder(MTLContext *mtlc);
 
 #endif /* MTLContext_h_Included */
