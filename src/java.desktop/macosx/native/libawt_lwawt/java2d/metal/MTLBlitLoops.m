@@ -42,7 +42,7 @@
 extern MTLPixelFormat PixelFormats[];
 extern void J2dTraceImpl(int level, jboolean cr, const char *string, ...);
 
-void _fillTxQuad(
+void fillTxQuad(
         struct TxtVertex * txQuadVerts,
         jint sx1, jint sy1, jint sx2, jint sy2, jint sw, jint sh,
         jdouble dx1, jdouble dy1, jdouble dx2, jdouble dy2, jdouble dw, jdouble dh
@@ -89,24 +89,6 @@ void _fillTxQuad(
     txQuadVerts[5].txtpos[1]   = nsy1;
 }
 
-//
-// DEBUG funcs, will be removed later
-//
-
-void _traceRaster(SurfaceDataRasInfo *srcInfo, int width, int height) {
-    char * p = srcInfo->rasBase;
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            char pix0 = p[y*srcInfo->scanStride + x*4];
-            char pix1 = p[y*srcInfo->scanStride + x*4 + 1];
-            char pix2 = p[y*srcInfo->scanStride + x*4 + 2];
-            char pix3 = p[y*srcInfo->scanStride + x*4 + 3];
-            J2dTrace4(J2D_TRACE_INFO, "[%d,%d,%d,%d], ", pix0, pix1, pix2, pix3);
-        }
-        J2dTraceLn(J2D_TRACE_INFO, "");
-    }
-}
-
 /**
  * Inner loop used for copying a source MTL "Surface" (window, pbuffer,
  * etc.) to a destination OpenGL "Surface".  Note that the same surface can
@@ -128,7 +110,7 @@ MTLBlitSurfaceToSurface(MTLContext *mtlc, BMTLSDOps *srcOps, BMTLSDOps *dstOps,
     J2dTraceNotImplPrimitive("MTLBlitSurfaceToSurface");
 }
 
-static void _drawTex2Tex(MTLContext *mtlc,
+static void drawTex2Tex(MTLContext *mtlc,
                         id<MTLTexture> src, id<MTLTexture> dst,
                         jboolean rtt, jint hint,
                         jint sx1, jint sy1, jint sx2, jint sy2,
@@ -145,7 +127,7 @@ static void _drawTex2Tex(MTLContext *mtlc,
     id<MTLRenderCommandEncoder> encoder = MTLContext_CreateSamplingEncoder(mtlc, dst);
 
     struct TxtVertex quadTxVerticesBuffer[6];
-    _fillTxQuad(quadTxVerticesBuffer, sx1, sy1, sx2, sy2, src.width, src.height, dx1, dy1, dx2, dy2, dst.width, dst.height);
+    fillTxQuad(quadTxVerticesBuffer, sx1, sy1, sx2, sy2, src.width, src.height, dx1, dy1, dx2, dy2, dst.width, dst.height);
 
     [encoder setVertexBytes:quadTxVerticesBuffer length:sizeof(quadTxVerticesBuffer) atIndex:MeshVertexBuffer];
     [encoder setFragmentTexture:src atIndex: 0];
@@ -177,7 +159,7 @@ MTLBlitTextureToSurface(MTLContext *mtlc,
     J2dTraceImpl(J2D_TRACE_VERBOSE, JNI_TRUE, "MTLBlitLoops_IsoBlit [via sampling]: bsrc=%p [tex=%p], bdst=%p [tex=%p] | s (%dx%d) -> d (%dx%d) | src (%d, %d, %d, %d) -> dst (%1.2f, %1.2f, %1.2f, %1.2f)", srcOps, srcOps->pTexture, dstOps, dstOps->pTexture, srcTex.width, srcTex.height, dstOps->width, dstOps->height, sx1, sy1, sx2, sy2, dx1, dy1, dx2, dy2);
 #endif //DEBUG
 
-    _drawTex2Tex(mtlc, srcOps->pTexture, dstOps->pTexture, rtt, hint, sx1, sy1, sx2, sy2, dx1, dy1, dx2, dy2);
+    drawTex2Tex(mtlc, srcOps->pTexture, dstOps->pTexture, rtt, hint, sx1, sy1, sx2, sy2, dx1, dy1, dx2, dy2);
 }
 
 /**
@@ -219,7 +201,7 @@ MTLBlitSwToSurfaceViaTexture(MTLContext *ctx, SurfaceDataRasInfo *srcInfo, BMTLS
     MTLRegion region = MTLRegionMake2D(0, 0, sw, sh);
     [texBuff replaceRegion:region mipmapLevel:0 withBytes:srcInfo->rasBase bytesPerRow:srcInfo->scanStride]; // texBuff is locked for current frame
 
-    _drawTex2Tex(ctx, texBuff, dest, 0, 0, 0, 0, sw, sh, dx1, dy1, dx2, dy2);
+    drawTex2Tex(ctx, texBuff, dest, 0, 0, 0, 0, sw, sh, dx1, dy1, dx2, dy2);
 }
 
 /**

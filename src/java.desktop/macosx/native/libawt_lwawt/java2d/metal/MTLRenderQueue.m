@@ -67,7 +67,7 @@ static MTLLayer ** g_modifiedLayers = NULL;
 static int g_modifiedLayersCount = 0;
 static int g_modifiedLayersAllocatedCount = 0;
 
-static void _markLayerModified(MTLLayer * modifiedLayer) {
+static void markLayerModified(MTLLayer * modifiedLayer) {
     if (modifiedLayer == NULL)
         return;
     if (g_modifiedLayers == NULL) {
@@ -86,7 +86,7 @@ static void _markLayerModified(MTLLayer * modifiedLayer) {
     g_modifiedLayers[g_modifiedLayersCount - 1] = modifiedLayer;
 }
 
-static void _scheduleBlitAllModifiedLayers() {
+static void scheduleBlitAllModifiedLayers() {
     for (int c = 0; c < g_modifiedLayersCount; ++c) {
         MTLLayer * layer = g_modifiedLayers[c];
         MTLContext * ctx = layer.ctx;
@@ -102,9 +102,9 @@ static void _scheduleBlitAllModifiedLayers() {
     g_modifiedLayersCount = 0;
 }
 
-static void _onSurfaceModified(BMTLSDOps *bmtldst) {
+static void onSurfaceModified(BMTLSDOps *bmtldst) {
     if (bmtldst != NULL && bmtldst->privOps != NULL && ((MTLSDOps *)bmtldst->privOps)->layer != NULL)
-        _markLayerModified(((MTLSDOps *)bmtldst->privOps)->layer);
+        markLayerModified(((MTLSDOps *) bmtldst->privOps)->layer);
 }
 
 static const jint g_drawOpcodes[] = {
@@ -129,7 +129,7 @@ static const jint g_drawOpcodes[] = {
         sun_java2d_pipe_BufferedOpCodes_SET_SHAPE_CLIP_SPANS
 };
 
-static jboolean _isDrawOpcode(jint opcode) {
+static jboolean isDrawOpcode(jint opcode) {
     for (int c = 0; c < sizeof(g_drawOpcodes)/sizeof(g_drawOpcodes[0]); ++c) {
         if (opcode == g_drawOpcodes[c])
             return JNI_TRUE;
@@ -388,7 +388,7 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
                                       sx1, sy1, sx2, sy2,
                                       dx1, dy1, dx2, dy2);
                 }
-                _onSurfaceModified(jlong_to_ptr(pDst));
+                onSurfaceModified(jlong_to_ptr(pDst));
             }
             break;
         case sun_java2d_pipe_BufferedOpCodes_SURFACE_TO_SW_BLIT:
@@ -810,12 +810,12 @@ Java_sun_java2d_metal_MTLRenderQueue_flushBuffer
             return;
         }
 
-        if (_isDrawOpcode(opcode)) // performed rendering operation on dstOps
-            _onSurfaceModified(dstOps);
+        if (isDrawOpcode(opcode)) // performed rendering operation on dstOps
+            onSurfaceModified(dstOps);
     }
 
     MTLTR_DisableGlyphModeState();
-    _scheduleBlitAllModifiedLayers();
+    scheduleBlitAllModifiedLayers();
 }
 
 /**

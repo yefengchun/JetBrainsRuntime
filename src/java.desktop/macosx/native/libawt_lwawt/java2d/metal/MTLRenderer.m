@@ -113,14 +113,9 @@ void MTLRenderer_DrawRect(MTLContext *mtlc, BMTLSDOps * dstOps, jint x, jint y, 
     [mtlEncoder endEncoding];
 }
 
-void _tracePoints(jint nPoints, jint *xPoints, jint *yPoints) {
-    for (int i = 0; i < nPoints; i++)
-        J2dTraceLn2(J2D_TRACE_INFO, "\t(%d, %d)", *(xPoints++), *(yPoints++));
-}
-
 const int POLYLINE_BUF_SIZE = 64;
 
-void _fillVertex(struct Vertex * vertex, int x, int y) {
+static void fillVertex(struct Vertex * vertex, int x, int y) {
     vertex->position[0] = x;
     vertex->position[1] = y;
     vertex->position[2] = 0;
@@ -155,7 +150,7 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
     const jint firstX = prevX;
     const jint firstY = prevY;
     while (nPoints > 0) {
-        _fillVertex(pointsChunk.verts, prevX + transX, prevY + transY);
+        fillVertex(pointsChunk.verts, prevX + transX, prevY + transY);
 
         const bool isLastChunk = nPoints + 1 <= POLYLINE_BUF_SIZE;
         __block int chunkSize = isLastChunk ? nPoints : POLYLINE_BUF_SIZE - 1;
@@ -163,13 +158,13 @@ void MTLRenderer_DrawPoly(MTLContext *mtlc, BMTLSDOps * dstOps,
         for (int i = 1; i < chunkSize; i++) {
             prevX = *(xPoints++);
             prevY = *(yPoints++);
-            _fillVertex(pointsChunk.verts + i, prevX + transX, prevY + transY);
+            fillVertex(pointsChunk.verts + i, prevX + transX, prevY + transY);
         }
 
         bool drawCloseSegment = false;
         if (isClosed && isLastChunk) {
             if (chunkSize + 2 <= POLYLINE_BUF_SIZE) {
-                _fillVertex(pointsChunk.verts + chunkSize, firstX + transX, firstY + transY);
+                fillVertex(pointsChunk.verts + chunkSize, firstX + transX, firstY + transY);
                 ++chunkSize;
             } else
                 drawCloseSegment = true;

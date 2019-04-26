@@ -27,3 +27,21 @@ static void traceMatrix(simd_float4x4 * mtx) {
                     mtx->columns[0][row], mtx->columns[1][row], mtx->columns[2][row], mtx->columns[3][row]);
     }
 }
+
+void traceRaster(char * p, int width, int height, int stride) {
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            char pix0 = p[y*stride + x*4];
+            char pix1 = p[y*stride + x*4 + 1];
+            char pix2 = p[y*stride + x*4 + 2];
+            char pix3 = p[y*stride + x*4 + 3];
+            J2dTrace4(J2D_TRACE_INFO, "[%d,%d,%d,%d], ", pix0, pix1, pix2, pix3);
+        }
+        J2dTraceLn(J2D_TRACE_INFO, "");
+    }
+}
+
+void tracePoints(jint nPoints, jint *xPoints, jint *yPoints) {
+    for (int i = 0; i < nPoints; i++)
+        J2dTraceLn2(J2D_TRACE_INFO, "\t(%d, %d)", *(xPoints++), *(yPoints++));
+}
