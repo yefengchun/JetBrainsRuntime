@@ -78,11 +78,19 @@ static jboolean MTLSurfaceData_initTexture(BMTLSDOps *bmtlsdo, jboolean isOpaque
         stencilDataDescriptor.storageMode = MTLStorageModePrivate;
         bmtlsdo->pStencilData = [ctx.device newTextureWithDescriptor:stencilDataDescriptor];
 
+        stencilDataDescriptor.sampleCount = 4;
+        stencilDataDescriptor.textureType = MTLTextureType2DMultisample;
+        bmtlsdo->pAAStencilData = [ctx.device newTextureWithDescriptor:stencilDataDescriptor];
+
+
         MTLTextureDescriptor *stencilTextureDescriptor =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8 width:width height:height mipmapped:NO];
         stencilTextureDescriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
         stencilTextureDescriptor.storageMode = MTLStorageModePrivate;
         bmtlsdo->pStencilTexture = [ctx.device newTextureWithDescriptor:stencilTextureDescriptor];
+        stencilTextureDescriptor.sampleCount = 4;
+        stencilTextureDescriptor.textureType = MTLTextureType2DMultisample;
+        bmtlsdo->pAAStencilTexture = [ctx.device newTextureWithDescriptor:stencilTextureDescriptor];
 
         MTLTextureDescriptor *lcdTextureDescriptor = 
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:width height:height mipmapped:NO];

@@ -419,11 +419,12 @@ const SurfaceRasterFlags defaultRasterFlags = { JNI_FALSE, JNI_TRUE };
     }
 
     if (_useStencil) {
-      // If you enable stencil testing or stencil writing, the
-      // MTLRenderPassDescriptor must include a stencil attachment.
-      rpd.stencilAttachment.texture = _mtlc.clip.stencilTextureRef;
-      rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
-      rpd.stencilAttachment.storeAction = MTLStoreActionDontCare;
+        // If you enable stencil testing or stencil writing, the
+        // MTLRenderPassDescriptor must include a stencil attachment.
+        rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
+        rpd.stencilAttachment.storeAction = MTLStoreActionDontCare;
+        rpd.stencilAttachment.texture = isAA ? _mtlc.clip.aaStencilTextureRef
+                                             : _mtlc.clip.stencilTextureRef;
     }
 
     // J2dTraceLn1(J2D_TRACE_VERBOSE, "created render encoder to draw on

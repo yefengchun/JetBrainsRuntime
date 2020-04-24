@@ -283,9 +283,11 @@ void MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount,
 
     // Destination texture to which render commands are encoded
     id<MTLTexture> dest = dstOps->pTexture;
+    id<MTLTexture> destAA = nil;
     bool isDestOpaque = dstOps->isOpaque;
     if (mtlc.clip.stencilMaskGenerationInProgress == JNI_TRUE) {
         dest = dstOps->pStencilData;
+        destAA = dstOps->pAAStencilData;
         isDestOpaque = NO;
     }
     id<MTLRenderCommandEncoder> mtlEncoder = [mtlc.encoderManager getRenderEncoder:dest isDstOpaque:isDestOpaque];
@@ -299,7 +301,7 @@ void MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount,
     struct Vertex vertexList[TOTAL_VERTICES_IN_BLOCK]; // a total of 170 triangles ==> 85 spans
 
     int counter = 0;
-
+    jint *aaspans = spans;
     for (int i = 0; i < spanCount; i++) {
         jfloat x1 = *(spans++);
         jfloat y1 = *(spans++);
@@ -315,6 +317,50 @@ void MTLRenderer_FillSpans(MTLContext *mtlc, BMTLSDOps * dstOps, jint spanCount,
             {{x2, y1}},
             {{x2, y2}
         }};
+
+        memcpy(&vertexList[counter], &verts, sizeof(verts));
+        counter += 6;
+
+        // If vertexList buffer full
+        if (counter % TOTAL_VERTICES_IN_BLOCK == 0) {
+            [mtlEncoder setVertexBytes:vertexList length:sizeof(vertexList) atIndex:MeshVertexBuffer];
+            [mtlEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:TOTAL_VERTICES_IN_BLOCK];
+            counter = 0;
+        }
+    }
+
+    // Draw triangles using remaining vertices if any
+    if (counter != 0) {
+        [mtlEncoder setVertexBytes:vertexList length:sizeof(vertexList) atIndex:MeshVertexBuffer];
+        [mtlEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:counter];
+    }
+
+
+    if (!destAA) return;
+
+    mtlEncoder = [mtlc.encoderManager getRenderEncoder:destAA isDstOpaque:isDestOpaque];
+    if (mtlEncoder == nil) {
+        J2dRlsTraceLn(J2D_TRACE_ERROR, "MTLRenderer_FillSpans: mtlEncoder is nil");
+        return;
+    }
+
+    counter = 0;
+
+    for (int i = 0; i < spanCount; i++) {
+        jfloat x1 = *(aaspans++);
+        jfloat y1 = *(aaspans++);
+        jfloat x2 = *(aaspans++);
+        jfloat y2 = *(aaspans++);
+
+        struct Vertex verts[6] = {
+                {{x1, y1}},
+                {{x1, y2}},
+                {{x2, y1}},
+
+                {{x1, y2}},
+                {{x2, y1}},
+                {{x2, y2}
+                }};
 
         memcpy(&vertexList[counter], &verts, sizeof(verts));
         counter += 6;
