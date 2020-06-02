@@ -16,6 +16,7 @@
 #import "JavaAccessibilityUtilities.h"
 #import "JavaTextAccessibility.h"
 #import "JavaListAccessibility.h"
+#import "JavaRowAccessibility.h"
 #import "JavaComponentAccessibility.h"
 #import "ThreadUtilities.h"
 #import "AWTView.h"
@@ -293,16 +294,18 @@ static jobject sAccessibilityClass = NULL;
         newChild = [TabGroupAccessibility alloc];
     } else if ([javaRole isEqualToString:@"scrollpane"]) {
         newChild = [ScrollAreaAccessibility alloc];
+    } else if ([[sRoles objectForKey:[parent javaRole]] isEqualToString:NSAccessibilityListRole]) {
+        newChild = [JavaRowAccessibility alloc];
     } else {
         NSString *nsRole = [sRoles objectForKey:javaRole];
-        if ([nsRole isEqualToString:NSAccessibilityStaticTextRole] || [nsRole isEqualToString:NSAccessibilityTextAreaRole] || [nsRole isEqualToString:NSAccessibilityTextFieldRole]) {
-            newChild = [JavaTextAccessibility alloc];
-        } else if ([nsRole isEqualToString:NSAccessibilityListRole]) {
-            newChild = [JavaListAccessibility alloc];
-        } else {
-            newChild = [JavaComponentAccessibility alloc];
+            if ([nsRole isEqualToString:NSAccessibilityStaticTextRole] || [nsRole isEqualToString:NSAccessibilityTextAreaRole] || [nsRole isEqualToString:NSAccessibilityTextFieldRole]) {
+                newChild = [JavaTextAccessibility alloc];
+            } else if ([nsRole isEqualToString:NSAccessibilityListRole]) {
+                newChild = [JavaListAccessibility alloc];
+            } else {
+                newChild = [JavaComponentAccessibility alloc];
+            }
         }
-    }
 
     // must init freshly -alloc'd object
     [newChild initWithParent:parent withEnv:env withAccessible:jCAX withIndex:index withView:view withJavaRole:javaRole]; // must init new instance
@@ -475,6 +478,14 @@ static jobject sAccessibilityClass = NULL;
     NSLog(@"%s: %@", __FUNCTION__, value);
 #endif
     return value;
+}
+
+- (jobject)accessible {
+    return fAccessible;
+}
+
+- (jobject)component {
+    return fComponent;
 }
 
 @end
