@@ -60,6 +60,7 @@
 
 @property(readonly) jobject accessible;
 @property(readonly) jobject component;
+@property(readonly) jint getFIndex;
 
 - (jobject)axContextWithEnv:(JNIEnv *)env;
 - (NSView*)view;

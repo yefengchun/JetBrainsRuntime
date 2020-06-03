@@ -34,12 +34,12 @@ static void RaiseMustOverrideException(NSString *method)
 
 - (NSString *)accessibilityLabel
 {
-//   RaiseMustOverrideException(@"accessibilityLabel");
-            JNIEnv *env = [ThreadUtilities getJNIEnv];
+    //   RaiseMustOverrideException(@"accessibilityLabel");
+    JNIEnv *env = [ThreadUtilities getJNIEnv];
     jobject axName = JNFCallStaticObjectMethod(env, sjm_getAccessibleName, [javaBase accessible], [javaBase component]);
-        NSString* str = JNFJavaToNSString(env, axName);
-        (*env)->DeleteLocalRef(env, axName);
-        return str;
+    NSString* str = JNFJavaToNSString(env, axName);
+    (*env)->DeleteLocalRef(env, axName);
+    return str;
 }
 
 - (NSArray *)accessibilityChildren

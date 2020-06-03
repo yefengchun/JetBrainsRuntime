@@ -5,5 +5,7 @@
 @interface JavaRowAccessibility : JavaElementAccessibility
 @end
 
-@interface PlatformAxRow : PlatformAxElement <NSAccessibilityRow>
+@interface PlatformAxRow : PlatformAxElement <NSAccessibilityRow> {
+    BOOL enabled;
+}
 @end

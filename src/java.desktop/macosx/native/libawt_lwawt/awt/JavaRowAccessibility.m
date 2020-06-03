@@ -4,6 +4,7 @@
 #import "JavaRowAccessibility.h"
 #import "JavaAccessibilityAction.h"
 #import "JavaAccessibilityUtilities.h"
+#import "JavaTextAccessibility.h"
 #import "ThreadUtilities.h"
 
 @implementation JavaRowAccessibility
@@ -16,17 +17,26 @@
 
 @implementation PlatformAxRow
 
+- (NSArray *)accessibilityChildren {
+    if ([super accessibilityChildren] == NULL) {
+        JNIEnv *env = [ThreadUtilities getJNIEnv];
+        return [NSArray arrayWithObject:[[JavaTextAccessibility alloc] initWithParent:[self javaBase]
+                                                                              withEnv:env
+                                                                       withAccessible:[[self javaBase] accessible]
+                                                                            withIndex:[[self javaBase] getFIndex]
+                                                                             withView:[[self javaBase] view]
+                                                                         withJavaRole:[[self javaBase] javaRole]]];
+    } else {
+        return [super accessibilityChildren];
+    }
+}
+
 - (NSInteger)accessibilityIndex {
     return [[self accessibilityParent] accessibilityIndexOfChild:self];
 }
 
 - (NSString *)accessibilityLabel {
     return [super accessibilityLabel];
-}
-
-- (BOOL)isAccessibilityEnabled
-{
-    return NO;
 }
 
 // to avoid warning (why?): method in protocol 'NSAccessibilityElement' not implemented

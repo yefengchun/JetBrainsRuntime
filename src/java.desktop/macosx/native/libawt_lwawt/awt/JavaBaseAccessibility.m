@@ -287,7 +287,7 @@ static jobject sAccessibilityClass = NULL;
         (*env)->DeleteLocalRef(env, jCAX);
         return [[value retain] autorelease];
     }
-
+    
     // otherwise, create a new instance
     JavaBaseAccessibility *newChild = nil;
     if ([javaRole isEqualToString:@"pagetablist"]) {
@@ -298,31 +298,31 @@ static jobject sAccessibilityClass = NULL;
         newChild = [JavaRowAccessibility alloc];
     } else {
         NSString *nsRole = [sRoles objectForKey:javaRole];
-            if ([nsRole isEqualToString:NSAccessibilityStaticTextRole] || [nsRole isEqualToString:NSAccessibilityTextAreaRole] || [nsRole isEqualToString:NSAccessibilityTextFieldRole]) {
-                newChild = [JavaTextAccessibility alloc];
-            } else if ([nsRole isEqualToString:NSAccessibilityListRole]) {
-                newChild = [JavaListAccessibility alloc];
-            } else {
-                newChild = [JavaComponentAccessibility alloc];
-            }
+        if ([nsRole isEqualToString:NSAccessibilityStaticTextRole] || [nsRole isEqualToString:NSAccessibilityTextAreaRole] || [nsRole isEqualToString:NSAccessibilityTextFieldRole]) {
+            newChild = [JavaTextAccessibility alloc];
+        } else if ([nsRole isEqualToString:NSAccessibilityListRole]) {
+            newChild = [JavaListAccessibility alloc];
+        } else {
+            newChild = [JavaComponentAccessibility alloc];
         }
-
+    }
+    
     // must init freshly -alloc'd object
     [newChild initWithParent:parent withEnv:env withAccessible:jCAX withIndex:index withView:view withJavaRole:javaRole]; // must init new instance
-
+    
     // If creating a JPopupMenu (not a combobox popup list) need to fire menuOpened.
     // This is the only way to know if the menu is opening; visible state change
     // can't be caught because the listeners are not set up in time.
     if ( [javaRole isEqualToString:@"popupmenu"] &&
-         ![[parent javaRole] isEqualToString:@"combobox"] ) {
+        ![[parent javaRole] isEqualToString:@"combobox"] ) {
         [newChild postMenuOpened];
     }
-
+    
     // must hard retain pointer poked into Java object
     [newChild retain];
     JNFSetLongField(env, jCAX, jf_ptr, ptr_to_jlong(newChild));
     (*env)->DeleteLocalRef(env, jCAX);
-
+    
     // return autoreleased instance
     return [newChild autorelease];
 }
@@ -486,6 +486,10 @@ static jobject sAccessibilityClass = NULL;
 
 - (jobject)component {
     return fComponent;
+}
+
+-(jint)getFIndex {
+    return fIndex;
 }
 
 @end
